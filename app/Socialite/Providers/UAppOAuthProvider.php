@@ -41,12 +41,12 @@ class UAppOAuthProvider extends AbstractProvider implements ProviderInterface
         $name = Arr::get($user, 'name');
 
         if (! $name) {
-            $givenName = Arr::get($user, 'given_name', '');
-            $familyName = Arr::get($user, 'family_name', '');
+            $givenName = Arr::get($user, 'first_name_th', '');
+            $familyName = Arr::get($user, 'last_name_th', '');
             $name = trim($givenName.' '.$familyName) ?: null;
         }
 
-        $email = Arr::get($user, 'email') ?? Arr::get($user, 'preferred_username');
+        $email = Arr::get($user, 'email') ?? Arr::get($user, 'username');
 
         return (new User)->setRaw($user)->map([
             'id' => Arr::get($user, 'sub'),

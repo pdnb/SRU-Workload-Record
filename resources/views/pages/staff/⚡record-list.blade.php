@@ -67,7 +67,7 @@ new class extends Component
                                 <td class="px-4 py-3 text-sm">
                                     @if ($score->hasMaximum())
                                         <flux:badge size="sm" color="purple">
-                                            {{ number_format($score->earned, 2) }} / {{ number_format($score->maximum, 2) }}
+                                            {{ number_format($score->earned, 2) }}
                                         </flux:badge>
                                     @elseif ($score->hasEarned())
                                         <flux:badge size="sm" color="purple">

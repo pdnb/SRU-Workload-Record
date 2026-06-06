@@ -878,7 +878,7 @@ new class extends Component
                             @php $liveScore = $this->liveScoreSummary; @endphp
                             @if ($liveScore->hasMaximum())
                                 <flux:badge color="purple">
-                                    {{ number_format($liveScore->earned, 2) }} / {{ number_format($liveScore->maximum, 2) }} คะแนน
+                                    {{ number_format($liveScore->earned, 2) }} คะแนน
                                 </flux:badge>
                             @elseif ($liveScore->hasEarned())
                                 <flux:badge color="purple">{{ number_format($liveScore->earned, 2) }} คะแนน</flux:badge>
@@ -886,7 +886,7 @@ new class extends Component
                         @endif
                         @php $progress = $this->workloadProgress; @endphp
                         <flux:badge color="green">
-                            {{ $progress['filled'] }} / {{ $progress['total'] }} ภาระงาน
+                            {{ $progress['filled'] }} ภาระงาน
                         </flux:badge>
                         <span class="text-zinc-500">บันทึกอัตโนมัติทุก 30 วินาที</span>
                     </div>

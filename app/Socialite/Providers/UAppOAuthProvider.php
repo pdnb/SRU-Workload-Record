@@ -49,7 +49,7 @@ class UAppOAuthProvider extends AbstractProvider implements ProviderInterface
         $email = Arr::get($user, 'email') ?? Arr::get($user, 'username');
 
         return (new User)->setRaw($user)->map([
-            'id' => Arr::get($user, 'sub'),
+            'id' => Arr::get($user, 'id'),
             'nickname' => Arr::get($user, 'nickname'),
             'name' => $name,
             'email' => $email,

@@ -1075,7 +1075,7 @@ new class extends Component
                             <dt class="text-zinc-500">คะแนนที่ได้</dt>
                             <dd class="font-medium text-purple-600 dark:text-purple-400">
                                 @if ($summaryScore->hasMaximum())
-                                    {{ number_format($summaryScore->earned, 2) }} / {{ number_format($summaryScore->maximum, 2) }}
+                                    {{ number_format($summaryScore->earned, 2) }} }}
                                 @else
                                     {{ number_format($summaryScore->earned, 2) }}
                                 @endif

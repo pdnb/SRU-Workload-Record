@@ -17,8 +17,7 @@ class UAppAuthController extends Controller
 {
     public function redirect(): RedirectResponse
     {
-        return Socialite::driver('uapp')
-            ->redirect();
+        return Socialite::driver('uapp')->redirect();
     }
 
     public function callback(): RedirectResponse
@@ -32,11 +31,6 @@ class UAppAuthController extends Controller
         }
 
         $email = Str::lower((string) $oauthUser->getEmail());
-        $domain = config('services.uapp.allowed_domain');
-
-        if (! $email || ! Str::endsWith($email, '@'.$domain)) {
-            return $this->redirectWithError('อนุญาตเฉพาะอีเมล @'.$domain.' เท่านั้น');
-        }
 
         $user = User::updateOrCreate(
             ['email' => $email],

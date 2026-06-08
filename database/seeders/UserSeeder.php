@@ -22,11 +22,19 @@ class UserSeeder extends Seeder
         ]);
 
         User::create([
-            'name' => 'หัวหน้างานเทคโนโลยี',
+            'name' => 'หัวหน้างาน',
             'email' => 'supervisor@sru.ac.th',
             'password' => Hash::make('P@$$w0rd'),
             ...$verified,
             'role' => UserRole::Supervisor,
+        ]);
+
+        User::create([
+            'name' => 'เจ้าหน้าที่',
+            'email' => 'staff@sru.ac.th',
+            'password' => Hash::make('P@$$w0rd'),
+            ...$verified,
+            'role' => UserRole::Staff,
         ]);
     }
 }

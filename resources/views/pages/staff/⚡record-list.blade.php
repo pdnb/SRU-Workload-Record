@@ -37,9 +37,9 @@ new class extends Component
             <flux:heading size="lg" class="mb-4">ปีงบประมาณ {{ $year }}</flux:heading>
 
             <div class="overflow-hidden rounded-xl border border-zinc-200 bg-white dark:border-zinc-700 dark:bg-zinc-800">
-                <table class="min-w-full divide-y divide-zinc-200 dark:divide-zinc-700">
-                    <thead class="bg-zinc-50 dark:bg-zinc-900">
-                        <tr>
+                <table class="w-full">
+                    <thead class="hidden lg:table-header-group">
+                        <tr class="divide-y divide-zinc-200 bg-zinc-50 dark:divide-zinc-700 dark:bg-zinc-900">
                             <th class="px-4 py-3 text-left text-sm font-medium text-zinc-600 dark:text-zinc-400">รอบประเมิน</th>
                             <th class="px-4 py-3 text-left text-sm font-medium text-zinc-600 dark:text-zinc-400">สถานะ</th>
                             <th class="px-4 py-3 text-left text-sm font-medium text-zinc-600 dark:text-zinc-400">ผลงาน</th>
@@ -50,35 +50,50 @@ new class extends Component
                     </thead>
                     <tbody class="divide-y divide-zinc-200 dark:divide-zinc-700">
                         @foreach ($records as $record)
-                            <tr wire:key="record-{{ $record->id }}">
-                                <td class="px-4 py-3 text-sm">{{ $record->evaluationPeriod->label }}</td>
-                                <td class="px-4 py-3">
+                            @php $score = $record->scoreSummary(); @endphp
+                            <tr
+                                class="block p-4 lg:table-row lg:p-0"
+                                wire:key="record-{{ $record->id }}"
+                            >
+                                <td class="flex items-center justify-between gap-4 border-b border-zinc-100 py-2.5 lg:table-cell lg:border-0 lg:px-4 lg:py-3 dark:border-zinc-700/50">
+                                    <span class="shrink-0 text-xs font-medium text-zinc-500 lg:hidden dark:text-zinc-400">รอบประเมิน</span>
+                                    <span class="text-right text-sm lg:text-left">{{ $record->evaluationPeriod->label }}</span>
+                                </td>
+                                <td class="flex items-center justify-between gap-4 border-b border-zinc-100 py-2.5 lg:table-cell lg:border-0 lg:px-4 lg:py-3 dark:border-zinc-700/50">
+                                    <span class="shrink-0 text-xs font-medium text-zinc-500 lg:hidden dark:text-zinc-400">สถานะ</span>
                                     <flux:badge :color="$record->status->color()" size="sm">
                                         {{ $record->status->label() }}
                                     </flux:badge>
                                 </td>
-                                <td class="px-4 py-3 text-sm">
+                                <td class="flex items-center justify-between gap-4 border-b border-zinc-100 py-2.5 lg:table-cell lg:border-0 lg:px-4 lg:py-3 dark:border-zinc-700/50">
+                                    <span class="shrink-0 text-xs font-medium text-zinc-500 lg:hidden dark:text-zinc-400">ผลงาน</span>
                                     <flux:badge size="sm" color="blue">
                                         {{ $record->workEntries->count() }} รายการ
                                     </flux:badge>
                                 </td>
-                                <td class="px-4 py-3 text-sm">{{ number_format($record->workEntries->sum('hours'), 1) }}</td>
-                                @php $score = $record->scoreSummary(); @endphp
-                                <td class="px-4 py-3 text-sm">
-                                    @if ($score->hasMaximum())
-                                        <flux:badge size="sm" color="purple">
-                                            {{ number_format($score->earned, 2) }}
-                                        </flux:badge>
-                                    @elseif ($score->hasEarned())
-                                        <flux:badge size="sm" color="purple">
-                                            {{ number_format($score->earned, 2) }}
-                                        </flux:badge>
-                                    @else
-                                        —
-                                    @endif
+                                <td class="flex items-center justify-between gap-4 border-b border-zinc-100 py-2.5 lg:table-cell lg:border-0 lg:px-4 lg:py-3 dark:border-zinc-700/50">
+                                    <span class="shrink-0 text-xs font-medium text-zinc-500 lg:hidden dark:text-zinc-400">งาน</span>
+                                    <span class="text-sm">{{ number_format($record->workEntries->sum('hours'), 1) }}</span>
                                 </td>
-                                <td class="px-4 py-3">
-                                    <div class="flex justify-end gap-2">
+                                <td class="flex items-center justify-between gap-4 border-b border-zinc-100 py-2.5 lg:table-cell lg:border-0 lg:px-4 lg:py-3 dark:border-zinc-700/50">
+                                    <span class="shrink-0 text-xs font-medium text-zinc-500 lg:hidden dark:text-zinc-400">คะแนน</span>
+                                    <span class="text-sm">
+                                        @if ($score->hasMaximum())
+                                            <flux:badge size="sm" color="purple">
+                                                {{ number_format($score->earned, 2) }}
+                                            </flux:badge>
+                                        @elseif ($score->hasEarned())
+                                            <flux:badge size="sm" color="purple">
+                                                {{ number_format($score->earned, 2) }}
+                                            </flux:badge>
+                                        @else
+                                            —
+                                        @endif
+                                    </span>
+                                </td>
+                                <td class="flex flex-col gap-3 pt-3 lg:table-cell lg:px-4 lg:py-3">
+                                    <span class="text-xs font-medium text-zinc-500 lg:hidden dark:text-zinc-400">การดำเนินการ</span>
+                                    <div class="flex flex-wrap gap-2 lg:justify-end">
                                         <flux:button
                                             :href="route('staff.records.show', $record)"
                                             variant="filled"

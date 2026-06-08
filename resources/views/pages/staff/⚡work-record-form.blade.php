@@ -880,7 +880,7 @@ new class extends Component
 <div>
     @if (! $readOnly)
         <div
-            class="sticky top-20 z-40 -mx-4 mb-6 border-b border-zinc-200 bg-white/95 px-4 py-3 backdrop-blur sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8 dark:border-zinc-700 dark:bg-zinc-900/95"
+            class="hidden md:block sticky top-20 z-40 -mx-4 mb-6 border-b border-zinc-200 bg-white/95 px-4 py-3 backdrop-blur sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8 dark:border-zinc-700 dark:bg-zinc-900/95"
             @if ($step === 2) wire:poll.30s="autoSave" @endif
         >
             <div class="flex w-full flex-col gap-3">
@@ -911,6 +911,7 @@ new class extends Component
                     </div>
                 </div>
 
+                {{--
                 @if ($step === 2)
                     @php $progress = $this->workloadProgress; @endphp
                     <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-4">
@@ -937,6 +938,7 @@ new class extends Component
                         @endif
                     </div>
                 @endif
+                --}}
             </div>
         </div>
     @endif
@@ -958,7 +960,7 @@ new class extends Component
 
     {{-- Step indicators --}}
     <div class="mb-8 flex gap-2">
-        @foreach ([1 => 'เลือกรอบประเมิน', 2 => 'บันทึกผลงาน', 3 => 'สรุปและส่ง'] as $num => $label)
+        @foreach ([1 => 'เลือกรอบ', 2 => 'บันทึกงาน', 3 => 'สรุปและส่ง'] as $num => $label)
             <button
                 type="button"
                 wire:click="goToStep({{ $num }})"
@@ -1011,9 +1013,11 @@ new class extends Component
         <div class="mb-4 lg:hidden">
             <flux:button wire:click="$set('sidebarDrawerOpen', true)" variant="outline" icon="bars-3" class="w-full">
                 เลือกภาระงาน
+                {{--
                 @if ($this->activeWorkload)
-                    <span class="ml-1 truncate text-zinc-500">— {{ $this->activeWorkload['name'] }}</span>
+                    <span class="invisible md:visible ml-1 truncate text-zinc-500">— {{ $this->activeWorkload['name'] }}</span>
                 @endif
+                --}}
             </flux:button>
         </div>
 
@@ -1091,7 +1095,7 @@ new class extends Component
                             <dt class="text-zinc-500">คะแนนที่ได้</dt>
                             <dd class="font-medium text-purple-600 dark:text-purple-400">
                                 @if ($summaryScore->hasMaximum())
-                                    {{ number_format($summaryScore->earned, 2) }} }}
+                                    {{ number_format($summaryScore->earned, 2) }}
                                 @else
                                     {{ number_format($summaryScore->earned, 2) }}
                                 @endif

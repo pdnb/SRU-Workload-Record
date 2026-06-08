@@ -14,7 +14,7 @@
 <div {{ $attributes->class(['rounded-xl border border-zinc-200 bg-white dark:border-zinc-700 dark:bg-zinc-800']) }} id="workload-detail-panel">
     @if ($active)
         <div class="border-b border-zinc-100 px-4 py-4 dark:border-zinc-700">
-            <p class="mb-1 text-xs text-zinc-500">
+            <p class="mb-1 text-sm text-zinc-500">
                 <span class="tabular-nums">{{ $active['group_number'] ?? '' }}</span>
                 <span class="mx-1">›</span>
                 <span class="tabular-nums">{{ $active['main_number'] ?? '' }}</span>

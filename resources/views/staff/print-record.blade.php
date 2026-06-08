@@ -70,10 +70,10 @@
                     @endif
                     @if ($entry->hasEvidence())
                         ·
-                        @if ($entry->evidence_type?->value === 'file')
-                            หลักฐาน: ไฟล์แนบ {{ count($entry->evidenceFilePaths()) }} ไฟล์
-                        @else
-                            หลักฐาน: {{ $entry->evidence }}
+                        @if ($entry->fileEvidences->isNotEmpty())
+                            หลักฐาน: {{ $entry->fileEvidences->map->displayName()->join(', ') }}
+                        @elseif ($entry->urlEvidence)
+                            หลักฐาน: {{ $entry->urlEvidence->value }}
                         @endif
                     @endif
                 </div>

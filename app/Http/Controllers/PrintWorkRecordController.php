@@ -18,6 +18,8 @@ class PrintWorkRecordController
             'user',
             'evaluationPeriod.fiscalYear',
             'workEntries.workload.workloadMain.workloadGroup',
+            'workEntries.fileEvidences',
+            'workEntries.urlEvidence',
         ]);
 
         $groups = WorkloadGroup::query()

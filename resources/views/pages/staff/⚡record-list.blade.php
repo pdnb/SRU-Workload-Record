@@ -93,7 +93,7 @@ new class extends Component
                                 </td>
                                 <td class="flex flex-col gap-3 pt-3 lg:table-cell lg:px-4 lg:py-3">
                                     <span class="text-xs font-medium text-zinc-500 lg:hidden dark:text-zinc-400">การดำเนินการ</span>
-                                    <div class="flex flex-wrap gap-2 lg:justify-end">
+                                    <div class="flex flex-wrap gap-2 justify-center lg:justify-end">
                                         <flux:button
                                             :href="route('staff.records.show', $record)"
                                             variant="filled"

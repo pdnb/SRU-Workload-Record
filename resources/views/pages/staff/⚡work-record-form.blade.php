@@ -4,6 +4,7 @@ use App\Data\WorkRecordScoreSummary;
 use App\Enums\WorkRecordStatus;
 use App\Models\EvaluationPeriod;
 use App\Models\WorkEntry;
+use App\Models\WorkEntryEvidence;
 use App\Models\WorkRecord;
 use App\Models\WorkloadGroup;
 use App\Support\WorkloadStructureNumbering;
@@ -51,6 +52,7 @@ new class extends Component
         'hours' => '',
         'evidence_type' => 'url',
         'evidence' => '',
+        'evidence_files' => [],
     ];
 
     /** @var array<int, \Livewire\Features\SupportFileUploads\TemporaryUploadedFile> */
@@ -71,7 +73,7 @@ new class extends Component
 
             $this->workRecord = $record->load([
                 'evaluationPeriod.fiscalYear',
-                'workEntries',
+                'workEntries.evidences',
             ]);
 
             $this->selectedPeriodId = $record->evaluation_period_id;
@@ -505,6 +507,7 @@ new class extends Component
                 'hours' => '',
                 'evidence_type' => 'url',
                 'evidence' => '',
+                'evidence_files' => [],
             ];
         }
 
@@ -544,6 +547,7 @@ new class extends Component
             'hours' => '',
             'evidence_type' => 'url',
             'evidence' => '',
+            'evidence_files' => [],
         ];
         $this->evidenceUploads = [];
         $this->resetValidation();
@@ -562,12 +566,13 @@ new class extends Component
         }
 
         if ($type === 'file' && $previousType === 'url') {
-            $this->modalEntry['evidence'] = [];
+            $this->modalEntry['evidence_files'] = [];
         }
 
         if ($type === 'url' && $previousType === 'file') {
             $this->deleteStoredEvidence($this->modalEntry);
             $this->modalEntry['evidence'] = '';
+            $this->modalEntry['evidence_files'] = [];
             $this->evidenceUploads = [];
         }
 
@@ -584,15 +589,22 @@ new class extends Component
 
     public function removeStoredEvidenceFile(int $index): void
     {
-        $paths = $this->modalEvidenceFilePaths();
+        $files = $this->modalEvidenceFiles();
 
-        if (! isset($paths[$index])) {
+        if (! isset($files[$index])) {
             return;
         }
 
-        Storage::disk('public')->delete($paths[$index]);
-        unset($paths[$index]);
-        $this->modalEntry['evidence'] = array_values($paths);
+        $file = $files[$index];
+
+        if ($id = $file['id'] ?? null) {
+            WorkEntryEvidence::find($id)?->delete();
+        } elseif ($path = $file['path'] ?? null) {
+            Storage::disk('public')->delete($path);
+        }
+
+        unset($files[$index]);
+        $this->modalEntry['evidence_files'] = array_values($files);
     }
 
     public function saveModalEntry(): void
@@ -612,7 +624,7 @@ new class extends Component
             $rules['modalEntry.evidence'] = ['nullable', 'url', 'max:2048'];
         } else {
             $hasExistingFiles = ($this->modalEntry['evidence_type'] ?? 'url') === 'file'
-                && $this->modalEvidenceFilePaths() !== [];
+                && $this->modalEvidenceFiles() !== [];
 
             $rules['evidenceUploads'] = [$hasExistingFiles || $this->evidenceUploads !== [] ? 'nullable' : 'required', 'array'];
             $rules['evidenceUploads.*'] = [
@@ -634,24 +646,30 @@ new class extends Component
         $entryData = $this->modalEntry;
 
         if (($entryData['evidence_type'] ?? 'url') === 'file' && $this->workRecord) {
-            $storedPaths = $this->modalEvidenceFilePaths();
+            $storedFiles = $this->modalEvidenceFiles();
 
             foreach ($this->evidenceUploads as $upload) {
-                $storedPaths[] = $upload->store(
-                    'work-evidence/'.$this->workRecord->id,
-                    'public',
-                );
+                $storedFiles[] = [
+                    'id' => null,
+                    'path' => $upload->store(
+                        'work-evidence/'.$this->workRecord->id,
+                        'public',
+                    ),
+                    'filename' => $upload->getClientOriginalName(),
+                ];
             }
 
-            $entryData['evidence'] = array_values($storedPaths);
+            $entryData['evidence_files'] = array_values($storedFiles);
             $entryData['evidence_type'] = 'file';
             $this->evidenceUploads = [];
         } elseif (($entryData['evidence_type'] ?? 'url') === 'url') {
             $this->deleteStoredEvidence($entryData);
             $entryData['evidence'] = trim($entryData['evidence'] ?? '');
+            $entryData['evidence_files'] = [];
             $entryData['evidence_type'] = filled($entryData['evidence']) ? 'url' : ($entryData['evidence_type'] ?? 'url');
         } elseif (($entryData['evidence_type'] ?? 'url') === 'file') {
             $entryData['evidence_type'] = 'file';
+            $entryData['evidence_files'] = $this->modalEvidenceFiles();
         }
 
         if ($this->modalEntryIndex !== null) {
@@ -748,15 +766,22 @@ new class extends Component
         $this->entries = [];
 
         foreach ($this->workRecord->workEntries as $entry) {
+            $entry->loadMissing(['fileEvidences', 'urlEvidence']);
+
             $this->entries[$entry->workload_id][] = [
                 'id' => $entry->id,
                 'detail' => $entry->detail,
                 'result' => $entry->result ?? '',
                 'hours' => $entry->hours,
-                'evidence_type' => $entry->evidence_type?->value ?? 'url',
-                'evidence' => $entry->evidence_type === \App\Enums\EvidenceType::File
-                    ? $entry->evidenceFilePaths()
-                    : ($entry->evidence ?? ''),
+                'evidence_type' => $entry->urlEvidence
+                    ? 'url'
+                    : ($entry->fileEvidences->isNotEmpty() ? 'file' : 'url'),
+                'evidence' => $entry->urlEvidence?->value ?? '',
+                'evidence_files' => $entry->fileEvidences->map(fn (WorkEntryEvidence $evidence) => [
+                    'id' => $evidence->id,
+                    'path' => $evidence->value,
+                    'filename' => $evidence->displayName(),
+                ])->values()->all(),
             ];
         }
     }
@@ -780,10 +805,6 @@ new class extends Component
                     'detail' => $data['detail'],
                     'result' => $data['result'] ?? null,
                     'hours' => $data['hours'] ?: 1,
-                    'evidence' => $this->encodeEvidenceForDatabase($data),
-                    'evidence_type' => $this->hasEntryEvidence($data)
-                        ? ($data['evidence_type'] ?? 'url')
-                        : null,
                     'sort_order' => $sortOrder,
                 ];
 
@@ -791,10 +812,12 @@ new class extends Component
                     $entry = WorkEntry::find($entryId);
                     if ($entry) {
                         $entry->update($payload);
+                        $this->syncEntryEvidences($entry, $data);
                         $keptIds[] = $entry->id;
                     }
                 } else {
                     $entry = $this->workRecord->workEntries()->create($payload);
+                    $this->syncEntryEvidences($entry, $data);
                     $keptIds[] = $entry->id;
                 }
             }
@@ -805,9 +828,88 @@ new class extends Component
             ->get()
             ->each(fn (WorkEntry $entry) => $entry->delete());
 
-        $this->workRecord->load('workEntries');
+        $this->workRecord->load(['workEntries.evidences']);
         $this->loadEntriesFromRecord();
         $this->bustWorkloadComputeds();
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     */
+    protected function syncEntryEvidences(WorkEntry $entry, array $data): void
+    {
+        if (! $this->hasEntryEvidence($data)) {
+            $entry->evidences()->get()->each->delete();
+
+            return;
+        }
+
+        $type = $data['evidence_type'] ?? 'url';
+
+        if ($type === 'url') {
+            $entry->fileEvidences()->get()->each->delete();
+
+            $url = trim((string) ($data['evidence'] ?? ''));
+
+            $entry->urlEvidence()?->delete();
+
+            if (filled($url)) {
+                $entry->evidences()->create([
+                    'type' => 'url',
+                    'value' => $url,
+                    'filename' => null,
+                    'sort_order' => 0,
+                ]);
+            }
+
+            return;
+        }
+
+        $entry->urlEvidence()?->delete();
+
+        $files = $this->entryEvidenceFiles($data);
+        $keptIds = [];
+
+        foreach ($files as $sortOrder => $file) {
+            $path = $file['path'] ?? '';
+            $filename = $file['filename'] ?? basename($path);
+
+            if (blank($path)) {
+                continue;
+            }
+
+            if ($id = $file['id'] ?? null) {
+                $evidence = WorkEntryEvidence::query()
+                    ->where('work_entry_id', $entry->id)
+                    ->find($id);
+
+                if ($evidence) {
+                    $evidence->update([
+                        'value' => $path,
+                        'filename' => $filename,
+                        'sort_order' => $sortOrder,
+                    ]);
+                    $keptIds[] = $evidence->id;
+                }
+
+                continue;
+            }
+
+            $evidence = $entry->evidences()->create([
+                'type' => 'file',
+                'value' => $path,
+                'filename' => $filename,
+                'sort_order' => $sortOrder,
+            ]);
+            $keptIds[] = $evidence->id;
+        }
+
+        $entry->fileEvidences()
+            ->when($keptIds !== [], fn ($query) => $query->whereNotIn('id', $keptIds))
+            ->when($keptIds === [], fn ($query) => $query)
+            ->get()
+            ->each
+            ->delete();
     }
 
     protected function deleteStoredEvidence(array $entry): void
@@ -816,36 +918,39 @@ new class extends Component
             return;
         }
 
-        foreach ($this->entryEvidenceFilePaths($entry) as $path) {
-            Storage::disk('public')->delete($path);
+        foreach ($this->entryEvidenceFiles($entry) as $file) {
+            if ($id = $file['id'] ?? null) {
+                WorkEntryEvidence::find($id)?->delete();
+            } elseif ($path = $file['path'] ?? null) {
+                Storage::disk('public')->delete($path);
+            }
         }
     }
 
     /**
-     * @return list<string>
+     * @return list<array{id: int|null, path: string, filename: string}>
      */
-    protected function modalEvidenceFilePaths(): array
+    protected function modalEvidenceFiles(): array
     {
-        return $this->entryEvidenceFilePaths($this->modalEntry);
+        return $this->entryEvidenceFiles($this->modalEntry);
     }
 
     /**
      * @param  array<string, mixed>  $entry
-     * @return list<string>
+     * @return list<array{id: int|null, path: string, filename: string}>
      */
-    protected function entryEvidenceFilePaths(array $entry): array
+    protected function entryEvidenceFiles(array $entry): array
     {
         if (($entry['evidence_type'] ?? null) !== 'file') {
             return [];
         }
 
-        $evidence = $entry['evidence'] ?? [];
+        $files = $entry['evidence_files'] ?? [];
 
-        if (is_array($evidence)) {
-            return array_values(array_filter($evidence, fn ($path) => is_string($path) && $path !== ''));
-        }
-
-        return filled($evidence) ? [(string) $evidence] : [];
+        return array_values(array_filter(
+            $files,
+            fn ($file) => is_array($file) && filled($file['path'] ?? null),
+        ));
     }
 
     /**
@@ -854,26 +959,10 @@ new class extends Component
     protected function hasEntryEvidence(array $data): bool
     {
         if (($data['evidence_type'] ?? 'url') === 'file') {
-            return $this->entryEvidenceFilePaths($data) !== [];
+            return $this->entryEvidenceFiles($data) !== [];
         }
 
         return filled($data['evidence'] ?? null);
-    }
-
-    /**
-     * @param  array<string, mixed>  $data
-     */
-    protected function encodeEvidenceForDatabase(array $data): ?string
-    {
-        if (! $this->hasEntryEvidence($data)) {
-            return null;
-        }
-
-        if (($data['evidence_type'] ?? 'url') === 'file') {
-            return json_encode($this->entryEvidenceFilePaths($data));
-        }
-
-        return trim((string) ($data['evidence'] ?? ''));
     }
 }; ?>
 
@@ -1040,16 +1129,15 @@ new class extends Component
             />
         </div>
 
-        <flux:modal wire:model="sidebarDrawerOpen" class="w-full max-w-lg lg:hidden">
-            <div class="space-y-4">
-                <flux:heading size="lg">เลือกภาระงาน</flux:heading>
+        <flux:modal wire:model="sidebarDrawerOpen" class="w-full max-w-lg lg:hidden p-2!" flyout>
+            <div class="space-y-4 mt-6">
                 <x-work-record.step2-sidebar
                     :read-only="$readOnly"
                     :workload-filter="$workloadFilter"
                     :selected-workload-id="$selectedWorkloadId"
                     :filtered-workload-tree="$this->filteredWorkloadTree"
                     :structure-numbers="$this->structureNumbers"
-                    class="max-h-[70vh]"
+                    class="border-none"
                 />
             </div>
         </flux:modal>
@@ -1099,6 +1187,7 @@ new class extends Component
                                 @else
                                     {{ number_format($summaryScore->earned, 2) }}
                                 @endif
+                                คะแนน
                             </dd>
                         </div>
                     @endif
@@ -1151,7 +1240,7 @@ new class extends Component
     @endif
 
     {{-- Entry modal --}}
-    <flux:modal wire:model="entryModalOpen" class="md:w-lg">
+    <flux:modal wire:model="entryModalOpen" class="md:w-lg" flyout>
         <div class="space-y-6">
             <div>
                 <flux:heading size="lg">

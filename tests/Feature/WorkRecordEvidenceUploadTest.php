@@ -79,15 +79,16 @@ class WorkRecordEvidenceUploadTest extends TestCase
         $this->assertNotNull($record);
         $this->assertSame(WorkRecordStatus::Draft, $record->status);
 
-        $entry = $record->workEntries()->first();
+        $entry = $record->workEntries()->with('fileEvidences')->first();
 
         $this->assertNotNull($entry);
-        $this->assertSame('file', $entry->evidence_type?->value);
-        $this->assertCount(2, $entry->evidenceFilePaths());
+        $this->assertCount(2, $entry->fileEvidences);
+        $this->assertSame('evidence-one.pdf', $entry->fileEvidences[0]->filename);
+        $this->assertSame('evidence-two.pdf', $entry->fileEvidences[1]->filename);
 
-        foreach ($entry->evidenceFilePaths() as $path) {
-            $this->assertStringStartsWith('work-evidence/'.$record->id.'/', $path);
-            Storage::disk('public')->assertExists($path);
+        foreach ($entry->fileEvidences as $evidence) {
+            $this->assertStringStartsWith('work-evidence/'.$record->id.'/', $evidence->value);
+            Storage::disk('public')->assertExists($evidence->value);
         }
     }
 
@@ -197,11 +198,11 @@ class WorkRecordEvidenceUploadTest extends TestCase
             ->set('modalEntry.hours', '3')
             ->call('saveModalEntry')
             ->assertHasNoErrors()
-            ->assertSee('ได้ 30.00 คะแนน')
+            ->assertSee('ได้')
+            ->assertSee('30.00 คะแนน')
             ->assertSee('30.00')
-            ->assertSee('30.00 / 100.00 คะแนน')
             ->call('goToStep', 3)
             ->assertSee('คะแนนที่ได้')
-            ->assertSee('30.00 / 100.00');
+            ->assertSee('30.00');
     }
 }

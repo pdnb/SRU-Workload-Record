@@ -5,6 +5,8 @@ namespace App\Models;
 use App\Enums\EvidenceType;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Support\Facades\Storage;
 
 class WorkEntry extends Model
@@ -15,8 +17,6 @@ class WorkEntry extends Model
         'detail',
         'result',
         'hours',
-        'evidence',
-        'evidence_type',
         'sort_order',
     ];
 
@@ -24,37 +24,7 @@ class WorkEntry extends Model
     {
         return [
             'hours' => 'decimal:1',
-            'evidence_type' => EvidenceType::class,
         ];
-    }
-
-    protected static function booted(): void
-    {
-        static::deleting(function (WorkEntry $entry) {
-            if ($entry->evidence_type === EvidenceType::File) {
-                foreach ($entry->evidenceFilePaths() as $path) {
-                    Storage::disk('public')->delete($path);
-                }
-            }
-        });
-    }
-
-    /**
-     * @return list<string>
-     */
-    public function evidenceFilePaths(): array
-    {
-        if ($this->evidence_type !== EvidenceType::File || blank($this->evidence)) {
-            return [];
-        }
-
-        $decoded = json_decode($this->evidence, true);
-
-        if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
-            return array_values(array_filter($decoded, fn ($path) => is_string($path) && $path !== ''));
-        }
-
-        return [$this->evidence];
     }
 
     public function workRecord(): BelongsTo
@@ -67,27 +37,57 @@ class WorkEntry extends Model
         return $this->belongsTo(Workload::class);
     }
 
+    public function evidences(): HasMany
+    {
+        return $this->hasMany(WorkEntryEvidence::class)->orderBy('sort_order');
+    }
+
+    public function fileEvidences(): HasMany
+    {
+        return $this->hasMany(WorkEntryEvidence::class)
+            ->where('type', EvidenceType::File)
+            ->orderBy('sort_order');
+    }
+
+    public function urlEvidence(): HasOne
+    {
+        return $this->hasOne(WorkEntryEvidence::class)
+            ->where('type', EvidenceType::Url);
+    }
+
+    /**
+     * @return list<string>
+     */
+    public function evidenceFilePaths(): array
+    {
+        return $this->fileEvidences->pluck('value')->all();
+    }
+
     public function hasEvidence(): bool
     {
-        if ($this->evidence_type === EvidenceType::File) {
-            return $this->evidenceFilePaths() !== [];
-        }
-
-        return filled($this->evidence);
+        return $this->evidences()->exists();
     }
 
     public function evidenceUrl(): ?string
     {
-        if (! $this->hasEvidence()) {
-            return null;
+        if ($this->urlEvidence) {
+            return $this->urlEvidence->value;
         }
 
-        if ($this->evidence_type === EvidenceType::File) {
-            $first = $this->evidenceFilePaths()[0] ?? null;
+        $firstFile = $this->fileEvidences->first();
 
-            return $first ? Storage::disk('public')->url($first) : null;
-        }
+        return $firstFile ? Storage::disk('public')->url($firstFile->value) : null;
+    }
 
-        return $this->evidence;
+    public static function isEvidencePathPreviewable(string $path): bool
+    {
+        return WorkEntryEvidence::isPathPreviewable($path);
+    }
+
+    public function evidencePreviewRoute(int $fileIndex): ?string
+    {
+        $evidence = $this->fileEvidences[$fileIndex] ?? null;
+
+        return $evidence?->previewRoute();
     }
 }

@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\EvidenceDownloadController;
+use App\Http\Controllers\EvidencePreviewController;
 use App\Http\Controllers\PrintWorkRecordController;
 use App\Http\Controllers\WorkRecordsExportController;
 use Illuminate\Support\Facades\Auth;
@@ -27,9 +28,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::livewire('records/{record}', 'pages::staff.work-record-form')->name('records.show');
         Route::livewire('records/{record}/edit', 'pages::staff.work-record-form')->name('records.edit');
         Route::get('records/{record}/print', PrintWorkRecordController::class)->name('records.print');
-        Route::get('evidence/{entry}/download/{fileIndex?}', EvidenceDownloadController::class)
-            ->whereNumber('fileIndex')
+        Route::get('evidence/{evidence}/download', EvidenceDownloadController::class)
             ->name('evidence.download');
+        Route::get('evidence/{evidence}/preview', EvidencePreviewController::class)
+            ->name('evidence.preview');
     });
 
     Route::middleware('role:supervisor')->prefix('supervisor')->name('supervisor.')->group(function () {

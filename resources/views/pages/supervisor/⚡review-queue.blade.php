@@ -26,6 +26,8 @@ new class extends Component
                 'user',
                 'evaluationPeriod.fiscalYear',
                 'workEntries.workload.workloadMain.workloadGroup',
+                'workEntries.fileEvidences',
+                'workEntries.urlEvidence',
             ])
             ->where('status', WorkRecordStatus::Submitted)
             ->whereHas('user', fn ($q) => $q->where('department', Auth::user()->department))
@@ -151,19 +153,19 @@ new class extends Component
                                         @endif
                                         @if ($entry->hasEvidence())
                                             <div class="mt-2 space-y-1">
-                                                @if ($entry->evidence_type?->value === 'file')
-                                                    @foreach ($entry->evidenceFilePaths() as $fileIndex => $path)
+                                                @if ($entry->fileEvidences->isNotEmpty())
+                                                    @foreach ($entry->fileEvidences as $evidence)
                                                         <div>
                                                             <flux:link
-                                                                :href="route('staff.evidence.download', ['entry' => $entry, 'fileIndex' => $fileIndex])"
+                                                                :href="$evidence->downloadRoute()"
                                                                 target="_blank"
                                                             >
-                                                                ดาวน์โหลด {{ basename($path) }}
+                                                                ดาวน์โหลด {{ $evidence->displayName() }}
                                                             </flux:link>
                                                         </div>
                                                     @endforeach
-                                                @else
-                                                    <flux:link :href="$entry->evidence" target="_blank">เปิดลิงก์หลักฐาน</flux:link>
+                                                @elseif ($entry->urlEvidence)
+                                                    <flux:link :href="$entry->urlEvidence->value" target="_blank">เปิดลิงก์หลักฐาน</flux:link>
                                                 @endif
                                             </div>
                                         @endif

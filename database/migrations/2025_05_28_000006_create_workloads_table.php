@@ -11,7 +11,7 @@ return new class extends Migration
         Schema::create('workloads', function (Blueprint $table) {
             $table->id();
             $table->foreignId('workload_main_id')->constrained()->cascadeOnDelete();
-            $table->string('name');
+            $table->string('name', 1000);
             $table->unsignedInteger('sort_order')->default(0);
             $table->timestamps();
         });

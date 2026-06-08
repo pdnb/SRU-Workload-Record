@@ -10,6 +10,7 @@ use App\Models\Workload;
 use App\Models\WorkloadGroup;
 use App\Models\WorkloadMain;
 use App\Services\PmsWorkloadHtmlParser;
+use App\Support\WorkloadStructureNumbering;
 use Flux\Flux;
 use Illuminate\Support\Facades\Gate;
 use Livewire\Attributes\Computed;
@@ -95,6 +96,12 @@ new class extends Component
             ->forFiscalYear($this->selectedFiscalYearId)
             ->with(['workloadMains.workloads'])
             ->get();
+    }
+
+    #[Computed]
+    public function structureNumbers(): array
+    {
+        return WorkloadStructureNumbering::buildMap($this->workloadGroups);
     }
 
     public function openCreateGroup(): void
@@ -464,6 +471,7 @@ new class extends Component
             >
                 <div class="flex items-center justify-between gap-4 border-b border-zinc-100 px-4 py-3 dark:border-zinc-700">
                     <div class="flex min-w-0 flex-1 items-center gap-2">
+                        <span class="shrink-0 tabular-nums text-zinc-400">{{ $this->structureNumbers['groups'][$group->id] }}.</span>
                         <flux:heading size="lg" class="truncate">{{ $group->name }}</flux:heading>
                         @if ($group->max_score !== null)
                             <flux:badge size="sm" color="zinc">สูงสุด {{ number_format($group->max_score, 2) }} คะแนน</flux:badge>
@@ -481,6 +489,7 @@ new class extends Component
                     <div wire:key="main-{{ $main->id }}" class="border-b border-zinc-50 px-4 py-3 last:border-0 dark:border-zinc-900">
                         <div class="mb-2 flex items-center justify-between">
                             <div class="flex min-w-0 flex-1 items-center gap-2 font-medium text-zinc-700 dark:text-zinc-300">
+                                <span class="shrink-0 tabular-nums text-zinc-400">{{ $this->structureNumbers['mains'][$main->id] }}</span>
                                 <span class="truncate">{{ $main->name }}</span>
                                 @if ($main->max_score !== null)
                                     <flux:badge size="sm" color="zinc">สูงสุด {{ number_format($main->max_score, 2) }} คะแนน</flux:badge>
@@ -498,6 +507,7 @@ new class extends Component
                             @foreach ($main->workloads as $workload)
                                 <li wire:key="wl-{{ $workload->id }}" class="flex items-center justify-between rounded-lg px-2 py-1 text-sm hover:bg-zinc-50 dark:hover:bg-zinc-900">
                                     <div class="flex min-w-0 flex-1 items-center gap-2">
+                                        <span class="shrink-0 tabular-nums text-zinc-400">{{ $this->structureNumbers['workloads'][$workload->id] }}</span>
                                         <span class="truncate">{{ $workload->name }}</span>
                                         @if ($workload->score !== null)
                                             <flux:badge size="sm" color="blue">{{ number_format($workload->score, 2) }} คะแนน</flux:badge>

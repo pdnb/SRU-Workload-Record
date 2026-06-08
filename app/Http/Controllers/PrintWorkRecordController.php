@@ -2,7 +2,9 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\WorkloadGroup;
 use App\Models\WorkRecord;
+use App\Support\WorkloadStructureNumbering;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\View\View;
 
@@ -18,6 +20,16 @@ class PrintWorkRecordController
             'workEntries.workload.workloadMain.workloadGroup',
         ]);
 
-        return view('staff.print-record', ['record' => $record]);
+        $groups = WorkloadGroup::query()
+            ->forFiscalYear($record->evaluationPeriod->fiscal_year_id)
+            ->with(['workloadMains.workloads'])
+            ->get();
+
+        $structureNumbers = WorkloadStructureNumbering::buildMap($groups);
+
+        return view('staff.print-record', [
+            'record' => $record,
+            'structureNumbers' => $structureNumbers,
+        ]);
     }
 }

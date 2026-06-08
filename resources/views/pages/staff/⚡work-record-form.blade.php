@@ -6,6 +6,7 @@ use App\Models\EvaluationPeriod;
 use App\Models\WorkEntry;
 use App\Models\WorkRecord;
 use App\Models\WorkloadGroup;
+use App\Support\WorkloadStructureNumbering;
 use Flux\Flux;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Gate;
@@ -143,8 +144,15 @@ new class extends Component
     }
 
     #[Computed]
+    public function structureNumbers(): array
+    {
+        return WorkloadStructureNumbering::buildMap($this->workloadGroups);
+    }
+
+    #[Computed]
     public function flatWorkloads()
     {
+        $numbers = $this->structureNumbers;
         $items = collect();
 
         foreach ($this->workloadGroups as $group) {
@@ -162,6 +170,9 @@ new class extends Component
                     $items->push([
                         'id' => $workload->id,
                         'name' => $workload->name,
+                        'number' => $numbers['workloads'][$workload->id] ?? '',
+                        'group_number' => $numbers['groups'][$group->id] ?? '',
+                        'main_number' => $numbers['mains'][$main->id] ?? '',
                         'score' => $workload->score,
                         'earned_score' => $earnedScore,
                         'group_id' => $group->id,
@@ -198,7 +209,10 @@ new class extends Component
                 return true;
             }
 
-            $haystack = mb_strtolower($item['name'].' '.$item['group_name'].' '.$item['main_name']);
+            $haystack = mb_strtolower(
+                $item['number'].' '.$item['group_number'].' '.$item['main_number'].' '
+                .$item['name'].' '.$item['group_name'].' '.$item['main_name'],
+            );
 
             return str_contains($haystack, $search);
         })->values();
@@ -1009,6 +1023,7 @@ new class extends Component
                 :workload-filter="$workloadFilter"
                 :selected-workload-id="$selectedWorkloadId"
                 :filtered-workload-tree="$this->filteredWorkloadTree"
+                :structure-numbers="$this->structureNumbers"
                 class="sticky top-36 hidden max-h-[calc(100vh-10rem)] lg:flex"
             />
 
@@ -1029,6 +1044,7 @@ new class extends Component
                     :workload-filter="$workloadFilter"
                     :selected-workload-id="$selectedWorkloadId"
                     :filtered-workload-tree="$this->filteredWorkloadTree"
+                    :structure-numbers="$this->structureNumbers"
                     class="max-h-[70vh]"
                 />
             </div>

@@ -40,7 +40,14 @@
     </p>
 
     @php
-        $grouped = $record->workEntries->groupBy(fn ($e) => $e->workload->workloadMain->workloadGroup->name.' › '.$e->workload->workloadMain->name);
+        $grouped = $record->workEntries->groupBy(function ($e) use ($structureNumbers) {
+            $main = $e->workload->workloadMain;
+            $group = $main->workloadGroup;
+            $groupNum = $structureNumbers['groups'][$group->id] ?? '';
+            $mainNum = $structureNumbers['mains'][$main->id] ?? '';
+
+            return $groupNum.' › '.$mainNum.' '.$group->name.' › '.$main->name;
+        });
     @endphp
 
     <h2>รายการผลงาน</h2>
@@ -49,7 +56,7 @@
         <h3>{{ $section }}</h3>
         @foreach ($entries as $entry)
             <div class="entry">
-                <strong>{{ $entry->workload->name }}</strong>
+                <strong>{{ $structureNumbers['workloads'][$entry->workload->id] ?? '' }} {{ $entry->workload->name }}</strong>
                 @if ($entry->workload->score !== null)
                     <span class="badge" style="margin-left: 8px;">{{ number_format($entry->workload->score, 2) }} คะแนน</span>
                 @endif

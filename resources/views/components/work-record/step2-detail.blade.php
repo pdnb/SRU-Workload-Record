@@ -15,9 +15,11 @@
     @if ($active)
         <div class="border-b border-zinc-100 px-4 py-4 dark:border-zinc-700">
             <p class="mb-1 text-xs text-zinc-500">
-                <span>{{ $active['group_name'] }}</span>
+                <span class="tabular-nums">{{ $active['group_number'] ?? '' }}</span>
                 <span class="mx-1">›</span>
-                <span>{{ $active['main_name'] }}</span>
+                <span class="tabular-nums">{{ $active['main_number'] ?? '' }}</span>
+                <span class="mx-1">›</span>
+                <span class="tabular-nums">{{ $active['number'] ?? '' }}</span>
             </p>
             <flux:heading size="lg">{{ $active['name'] }}</flux:heading>
             <div class="mt-2 flex flex-wrap gap-2">

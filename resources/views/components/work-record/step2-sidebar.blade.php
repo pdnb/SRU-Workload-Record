@@ -3,6 +3,7 @@
     'workloadFilter' => 'all',
     'selectedWorkloadId' => null,
     'filteredWorkloadTree' => null,
+    'structureNumbers' => ['groups' => [], 'mains' => [], 'workloads' => []],
 ])
 
 <div
@@ -64,6 +65,7 @@
                     class="flex w-full cursor-pointer items-center gap-2 rounded-lg px-2 py-2 text-left text-sm font-medium hover:bg-zinc-50 dark:hover:bg-zinc-900"
                 >
                     <span x-bind:class="isGroupOpen({{ $group->id }}) ? 'rotate-90' : ''" class="text-zinc-400 transition-transform">›</span>
+                    <span class="shrink-0 tabular-nums text-zinc-400">{{ $structureNumbers['groups'][$group->id] ?? '' }}.</span>
                     <span class="min-w-0 flex-1 truncate">{{ $group->name }}</span>
                 </button>
 
@@ -79,6 +81,7 @@
                                 class="flex w-full cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 text-left text-xs font-medium text-zinc-500 hover:bg-zinc-50 dark:hover:bg-zinc-900"
                             >
                                 <span x-bind:class="isMainOpen({{ $main->id }}) ? 'rotate-90' : ''" class="text-zinc-400 transition-transform">›</span>
+                                <span class="shrink-0 tabular-nums text-zinc-400">{{ $structureNumbers['mains'][$main->id] ?? '' }}</span>
                                 <span class="min-w-0 flex-1 truncate">{{ $main->name }}</span>
                             </button>
 
@@ -94,6 +97,7 @@
                                             'hover:bg-zinc-50 dark:hover:bg-zinc-900' => $selectedWorkloadId !== $item['id'],
                                         ])
                                     >
+                                        <span class="shrink-0 tabular-nums text-zinc-400">{{ $item['number'] ?? '' }}</span>
                                         <span class="min-w-0 flex-1 truncate">{{ $item['name'] }}</span>
                                         @if ($item['entry_count'] > 0)
                                             <flux:badge size="sm" color="blue">{{ $item['entry_count'] }}</flux:badge>

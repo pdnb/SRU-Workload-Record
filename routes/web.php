@@ -3,11 +3,22 @@
 use App\Http\Controllers\EvidenceDownloadController;
 use App\Http\Controllers\EvidencePreviewController;
 use App\Http\Controllers\PrintWorkRecordController;
+use App\Http\Controllers\PublicEvidenceDownloadController;
+use App\Http\Controllers\PublicEvidencePreviewController;
+use App\Http\Controllers\PublicWorkloadSummaryController;
 use App\Http\Controllers\WorkRecordsExportController;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Route;
 
 Route::redirect('/', '/login');
+
+Route::middleware('throttle:60,1')->prefix('s')->name('share.workload.')->group(function () {
+    Route::get('{token}', PublicWorkloadSummaryController::class)->name('show');
+    Route::get('{token}/evidence/{evidence}/preview', PublicEvidencePreviewController::class)
+        ->name('evidence.preview');
+    Route::get('{token}/evidence/{evidence}/download', PublicEvidenceDownloadController::class)
+        ->name('evidence.download');
+});
 
 Route::redirect('/dashboard', '/home')->name('dashboard');
 

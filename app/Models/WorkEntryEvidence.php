@@ -72,6 +72,20 @@ class WorkEntryEvidence extends Model
         return route('staff.evidence.download', $this);
     }
 
+    public function publicPreviewRoute(string $token): ?string
+    {
+        if ($this->type !== EvidenceType::File || ! self::isPathPreviewable($this->value)) {
+            return null;
+        }
+
+        return route('share.workload.evidence.preview', ['token' => $token, 'evidence' => $this]);
+    }
+
+    public function publicDownloadRoute(string $token): string
+    {
+        return route('share.workload.evidence.download', ['token' => $token, 'evidence' => $this]);
+    }
+
     public static function isPathPreviewable(string $path): bool
     {
         return in_array(strtolower(pathinfo($path, PATHINFO_EXTENSION)), [

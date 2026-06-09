@@ -116,7 +116,7 @@ new #[Layout('components.layouts.auth.sru')] class extends Component {
             required
             autofocus
             autocomplete="email"
-            placeholder="name@example.com"
+            placeholder="email@sru.ac.th"
         />
 
         <div class="space-y-2">

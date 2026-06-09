@@ -47,6 +47,11 @@ class WorkRecord extends Model
         return $this->hasMany(WorkEntry::class)->orderBy('sort_order');
     }
 
+    public function workloadShares(): HasMany
+    {
+        return $this->hasMany(WorkloadShare::class);
+    }
+
     public function isEditable(): bool
     {
         if (! in_array($this->status, [WorkRecordStatus::Draft, WorkRecordStatus::Rejected])) {

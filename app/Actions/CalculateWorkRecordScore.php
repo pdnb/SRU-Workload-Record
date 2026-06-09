@@ -59,7 +59,7 @@ class CalculateWorkRecordScore
         );
     }
 
-    private function entryScore(WorkEntry $entry): float
+    public function entryScore(WorkEntry $entry): float
     {
         $score = $entry->workload?->score;
 

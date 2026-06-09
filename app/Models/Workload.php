@@ -26,4 +26,9 @@ class Workload extends Model
     {
         return $this->hasMany(WorkEntry::class);
     }
+
+    public function workloadShares(): HasMany
+    {
+        return $this->hasMany(WorkloadShare::class);
+    }
 }

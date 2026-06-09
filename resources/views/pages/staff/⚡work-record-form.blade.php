@@ -7,6 +7,7 @@ use App\Models\WorkEntry;
 use App\Models\WorkEntryEvidence;
 use App\Models\WorkRecord;
 use App\Models\WorkloadGroup;
+use App\Models\WorkloadShare;
 use App\Support\WorkloadStructureNumbering;
 use Flux\Flux;
 use Illuminate\Support\Facades\Auth;
@@ -351,6 +352,74 @@ new class extends Component
     {
         $this->selectedWorkloadId = $id;
         $this->sidebarDrawerOpen = false;
+        unset($this->selectedWorkloadShare);
+    }
+
+    #[Computed]
+    public function canShareSelectedWorkload(): bool
+    {
+        if (! $this->workRecord || ! $this->selectedWorkloadId) {
+            return false;
+        }
+
+        return Gate::allows('manageRecordWorkload', [$this->workRecord, $this->selectedWorkloadId]);
+    }
+
+    #[Computed]
+    public function selectedWorkloadShare(): ?WorkloadShare
+    {
+        if (! $this->workRecord || ! $this->selectedWorkloadId) {
+            return null;
+        }
+
+        return WorkloadShare::query()
+            ->where('work_record_id', $this->workRecord->id)
+            ->where('workload_id', $this->selectedWorkloadId)
+            ->first();
+    }
+
+    public function enableWorkloadShare(): void
+    {
+        if (! $this->workRecord || ! $this->selectedWorkloadId) {
+            return;
+        }
+
+        Gate::authorize('manageRecordWorkload', [$this->workRecord, $this->selectedWorkloadId]);
+
+        $share = WorkloadShare::query()->firstOrNew([
+            'work_record_id' => $this->workRecord->id,
+            'workload_id' => $this->selectedWorkloadId,
+        ]);
+
+        $share->regenerateToken();
+        $share->enabled_at = now();
+        $share->save();
+
+        unset($this->selectedWorkloadShare);
+
+        Flux::toast('เปิดการแชร์ลิงก์สรุปแล้ว');
+    }
+
+    public function disableWorkloadShare(): void
+    {
+        $share = $this->selectedWorkloadShare;
+
+        if ($share === null) {
+            return;
+        }
+
+        Gate::authorize('manage', $share);
+
+        $share->update(['enabled_at' => null]);
+
+        unset($this->selectedWorkloadShare);
+
+        Flux::toast('ปิดการแชร์ลิงก์แล้ว');
+    }
+
+    public function notifyShareLinkCopied(): void
+    {
+        Flux::toast('คัดลอกลิงก์แล้ว');
     }
 
     public function setWorkloadFilter(string $filter): void
@@ -1121,11 +1190,14 @@ new class extends Component
             />
 
             <x-work-record.step2-detail
-                wire:key="workload-detail-{{ $selectedWorkloadId }}-{{ count($entries[$selectedWorkloadId] ?? []) }}"
+                wire:key="workload-detail-{{ $selectedWorkloadId }}-{{ count($entries[$selectedWorkloadId] ?? []) }}-{{ $this->selectedWorkloadShare?->enabled_at?->timestamp }}"
                 :read-only="$readOnly"
                 :active-workload="$this->activeWorkload"
                 :selected-workload-id="$selectedWorkloadId"
                 :entries="$entries"
+                :can-share="$this->canShareSelectedWorkload"
+                :share-enabled="$this->selectedWorkloadShare?->isEnabled() ?? false"
+                :share-url="$this->selectedWorkloadShare?->isEnabled() ? $this->selectedWorkloadShare->shareUrl() : null"
             />
         </div>
 
@@ -1143,8 +1215,14 @@ new class extends Component
         </flux:modal>
 
         <div class="mt-6 flex justify-between">
-            <flux:button wire:click="goToStep(1)" variant="ghost">ย้อนกลับ</flux:button>
-            <flux:button wire:click="goToStep(3)" variant="primary">ถัดไป</flux:button>
+            @if ($readOnly)
+                <flux:button wire:click="goToStep(3)" variant="ghost">กลับไปสรุป</flux:button>
+            @else
+                <flux:button wire:click="goToStep(1)" variant="ghost">ย้อนกลับ</flux:button>
+            @endif
+            @unless ($readOnly)
+                <flux:button wire:click="goToStep(3)" variant="primary">ถัดไป</flux:button>
+            @endunless
         </div>
     @endif
 
@@ -1157,7 +1235,7 @@ new class extends Component
                 @php $liveScore = $this->liveScoreSummary; @endphp
                 @if ($liveScore->hasMaximum())
                     <flux:badge color="purple">
-                        {{ number_format($liveScore->earned, 2) }} / {{ number_format($liveScore->maximum, 2) }} คะแนน
+                        {{ number_format($liveScore->earned, 2) }} คะแนน
                     </flux:badge>
                 @elseif ($liveScore->hasEarned())
                     <flux:badge color="purple">{{ number_format($liveScore->earned, 2) }} คะแนน</flux:badge>
@@ -1230,11 +1308,16 @@ new class extends Component
                 </div>
             @else
                 <flux:button :href="route('staff.records.index')" variant="ghost" wire:navigate>กลับ</flux:button>
-                @if ($workRecord)
-                    <flux:button :href="route('staff.records.print', $workRecord)" variant="primary" icon="printer" target="_blank">
-                        พิมพ์
+                <div class="flex flex-wrap gap-2">
+                    <flux:button wire:click="goToStep(2)" variant="filled" icon="clipboard-document-list">
+                        ดูรายการผลงาน
                     </flux:button>
-                @endif
+                    @if ($workRecord)
+                        <flux:button :href="route('staff.records.print', $workRecord)" variant="primary" icon="printer" target="_blank">
+                            พิมพ์
+                        </flux:button>
+                    @endif
+                </div>
             @endunless
         </div>
     @endif

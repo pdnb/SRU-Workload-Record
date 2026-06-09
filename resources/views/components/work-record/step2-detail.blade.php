@@ -3,6 +3,9 @@
     'activeWorkload' => null,
     'selectedWorkloadId' => null,
     'entries' => [],
+    'canShare' => false,
+    'shareEnabled' => false,
+    'shareUrl' => null,
 ])
 
 @php
@@ -44,6 +47,70 @@
                     <flux:badge size="sm" color="zinc">{{ number_format($active['hours_sum'], 1) }} งาน</flux:badge>
                 @endif
             </div>
+
+            @if ($canShare && count($workloadEntries))
+                <div class="mt-4 rounded-lg border border-zinc-200 bg-zinc-50 p-4 dark:border-zinc-600 dark:bg-zinc-900">
+                    <div class="flex flex-wrap items-center justify-between gap-2">
+                        <div>
+                            <p class="text-sm font-medium">แชร์ลิงก์สรุปผลงาน</p>
+                            <p class="text-xs text-zinc-500">
+                                @if ($shareEnabled)
+                                    ลิงก์เปิดใช้งาน — ผู้รับไม่ต้องล็อกอิน
+                                @else
+                                    สร้างลิงก์สาธารณะสรุปผลงานภาระงานนี้
+                                @endif
+                            </p>
+                        </div>
+                        @if ($shareEnabled)
+                            <flux:badge size="sm" color="green">เปิดใช้งาน</flux:badge>
+                        @else
+                            <flux:badge size="sm" color="zinc">ปิดอยู่</flux:badge>
+                        @endif
+                    </div>
+
+                    <div class="mt-3 flex flex-wrap gap-2">
+                        @if ($shareEnabled && $shareUrl)
+                            <flux:button
+                                type="button"
+                                variant="filled"
+                                size="sm"
+                                icon="link"
+                                x-on:click="navigator.clipboard.writeText(@js($shareUrl)); $wire.notifyShareLinkCopied()"
+                            >
+                                คัดลอกลิงก์
+                            </flux:button>
+                            <flux:button
+                                :href="$shareUrl"
+                                variant="ghost"
+                                size="sm"
+                                icon="arrow-top-right-on-square"
+                                target="_blank"
+                            >
+                                ดูตัวอย่าง
+                            </flux:button>
+                            <flux:button
+                                wire:click="disableWorkloadShare"
+                                variant="ghost"
+                                size="sm"
+                                icon="x-mark"
+                                wire:loading.attr="disabled"
+                            >
+                                ปิดการแชร์
+                            </flux:button>
+                        @else
+                            <flux:button
+                                wire:click="enableWorkloadShare"
+                                variant="primary"
+                                size="sm"
+                                icon="share"
+                                wire:loading.attr="disabled"
+                            >
+                                เปิดการแชร์
+                            </flux:button>
+                        @endif
+                    </div>
+                </div>
+            @endif
         </div>
 
         <div class="p-4">

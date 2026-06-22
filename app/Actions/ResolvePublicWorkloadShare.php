@@ -2,6 +2,7 @@
 
 namespace App\Actions;
 
+use App\Enums\WorkRecordStatus;
 use App\Models\WorkEntryEvidence;
 use App\Models\WorkloadShare;
 
@@ -12,9 +13,15 @@ class ResolvePublicWorkloadShare
         $share = WorkloadShare::query()
             ->where('token', $token)
             ->whereNotNull('enabled_at')
+            ->with('workRecord')
             ->first();
 
         abort_if($share === null, 404);
+
+        abort_unless(
+            in_array($share->workRecord->status, [WorkRecordStatus::Submitted, WorkRecordStatus::Approved], true),
+            404,
+        );
 
         return $share;
     }

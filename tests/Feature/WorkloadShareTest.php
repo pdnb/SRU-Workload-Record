@@ -158,6 +158,21 @@ class WorkloadShareTest extends TestCase
         $this->get(route('share.workload.show', (string) str()->uuid()))->assertNotFound();
     }
 
+    public function test_enabled_share_for_draft_record_returns_not_found(): void
+    {
+        $data = $this->createSubmittedRecordWithEvidence();
+        $data['record']->update(['status' => WorkRecordStatus::Draft, 'submitted_at' => null]);
+
+        $share = WorkloadShare::create([
+            'work_record_id' => $data['record']->id,
+            'workload_id' => $data['workload']->id,
+            'token' => (string) str()->uuid(),
+            'enabled_at' => now(),
+        ]);
+
+        $this->get(route('share.workload.show', $share->token))->assertNotFound();
+    }
+
     public function test_public_evidence_preview_and_download_require_valid_token(): void
     {
         $data = $this->createSubmittedRecordWithEvidence();

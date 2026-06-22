@@ -10,7 +10,6 @@ class PostLoginRedirect
     {
         $route = match (true) {
             $user->isStaff() => 'staff.records.index',
-            $user->isSupervisor() => 'supervisor.review.index',
             default => 'hr.dashboard',
         };
 

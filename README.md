@@ -191,6 +191,170 @@ jobs:
 
 อย่าลืมอัปเดต `APP_URL`, `UAPP_OAUTH_REDIRECT_URI` และ callback URL ที่ลงทะเบียนกับ UApp OAuth ให้ตรงกับโดเมน production
 
+## Deploy บน HestiaCP
+
+สำหรับ VPS/เซิร์ฟเวอร์ที่ใช้ [HestiaCP](https://hestiacp.com) (nginx + PHP-FPM + MariaDB/MySQL)
+
+### ความต้องการบนเซิร์ฟเวอร์
+
+| รายการ | ค่าที่แนะนำ |
+|--------|-------------|
+| PHP | 8.2+ (เลือก template PHP 8.2/8.3 ใน HestiaCP) |
+| Extensions | `bcmath`, `ctype`, `curl`, `dom`, `fileinfo`, `mbstring`, `openssl`, `pdo`, `pdo_mysql`, `tokenizer`, `xml`, `zip` |
+| Composer | ติดตั้ง global สำหรับ user ที่ deploy |
+| Node.js | 22+ (สำหรับ build assets บนเซิร์ฟเวอร์) — หรือ build ใน CI แล้ว deploy `public/build` มาพร้อมกัน |
+| Database | MariaDB/MySQL สร้างจาก HestiaCP → Databases |
+| Upload limit | ≥ 12M (`upload_max_filesize`, `post_max_size`) — แอปรับไฟล์หลักฐานสูงสุด 10 MB |
+
+### ติดตั้งครั้งแรก
+
+**1. สร้าง Web Domain ใน HestiaCP**
+
+- WEB → Add Web Domain → ใส่โดเมน (เช่น `workload.sru.ac.th`)
+- เปิด SSL (Let's Encrypt) หลัง DNS ชี้มาที่เซิร์ฟเวอร์แล้ว
+- สร้าง Database + user จาก Databases แล้วจดชื่อ/รหัสผ่าน
+
+**2. Clone โปรเจกต์**
+
+SSH เข้าเป็น user ของโดเมน (เช่น `admin`):
+
+```bash
+DOMAIN=workload.sru.ac.th
+WEB_ROOT="/home/$(whoami)/web/${DOMAIN}"
+
+cd "$WEB_ROOT"
+rm -rf public_html   # โฟลเดอร์ default ของ HestiaCP — ไม่ใช้สำหรับ Laravel
+git clone https://github.com/YOUR_ORG/sru-workload-record.git .
+```
+
+**3. ตั้ง document root ให้ชี้ `public/`**
+
+```bash
+# รันจาก root หรือ user ที่มีสิทธิ์ HestiaCP CLI
+v-change-web-domain-docroot "$(whoami)" "$DOMAIN" public
+```
+
+**4. ตั้งค่า `.env`**
+
+```bash
+cp .env.example .env
+php artisan key:generate
+nano .env   # หรือ editor อื่น
+```
+
+ค่าสำคัญสำหรับ production:
+
+```env
+APP_NAME="SRU Workload Record"
+APP_ENV=production
+APP_DEBUG=false
+APP_URL=https://workload.sru.ac.th
+APP_LOCALE=th
+
+DB_CONNECTION=mysql
+DB_HOST=localhost
+DB_PORT=3306
+DB_DATABASE=admin_workload
+DB_USERNAME=admin_workload
+DB_PASSWORD=your-db-password
+
+SESSION_DRIVER=database
+QUEUE_CONNECTION=sync
+CACHE_STORE=database
+
+UAPP_OAUTH_CLIENT_ID=
+UAPP_OAUTH_CLIENT_SECRET=
+UAPP_OAUTH_REDIRECT_URI="${APP_URL}/auth/uapp/callback"
+UAPP_OAUTH_AUTHORIZE_URL=
+UAPP_OAUTH_TOKEN_URL=
+UAPP_OAUTH_USERINFO_URL=
+UAPP_EMAIL_DOMAIN=sru.ac.th
+```
+
+> ใช้ `QUEUE_CONNECTION=sync` บน shared hosting — แอปนี้ยังไม่มี background jobs ที่ต้อง worker
+
+**5. Build และ migrate**
+
+```bash
+composer install --no-dev --optimize-autoloader
+npm ci && npm run build    # ข้ามได้ถ้า build ใน CI แล้ว
+php artisan migrate --force
+php artisan storage:link
+php artisan optimize
+```
+
+**6. สิทธิ์โฟลเดอร์**
+
+```bash
+chmod -R ug+rwx storage bootstrap/cache
+```
+
+PHP-FPM รันเป็น user เดียวกับเจ้าของไฟล์ — ไม่ต้อง `chown www-data` บน HestiaCP
+
+**7. Cron (Laravel Scheduler)**
+
+HestiaCP → CRON → Add job:
+
+```cron
+* * * * * cd /home/USER/web/workload.sru.ac.th && /usr/bin/php artisan schedule:run >> /dev/null 2>&1
+```
+
+แทน `USER` และ path ให้ตรงกับเซิร์ฟเวอร์จริง
+
+### Deploy ครั้งถัดไป
+
+ใช้สคริปต์ใน repo:
+
+```bash
+chmod +x deploy/hestiacp-deploy.sh
+./deploy/hestiacp-deploy.sh
+```
+
+ตัวแปรที่ปรับได้:
+
+| ตัวแปร | ค่าเริ่มต้น | ความหมาย |
+|--------|-------------|----------|
+| `APP_DIR` | โฟลเดอร์โปรเจกต์ | path Laravel root |
+| `DEPLOY_BRANCH` | `main` | branch ที่ pull |
+| `BUILD_ASSETS` | `auto` | `yes` / `no` / `auto` (build เมื่อมี npm) |
+
+ตัวอย่าง deploy โดยไม่ build บนเซิร์ฟเวอร์ (assets build ใน CI แล้ว):
+
+```bash
+BUILD_ASSETS=no ./deploy/hestiacp-deploy.sh
+```
+
+### PHP upload limit (ไฟล์หลักฐาน)
+
+HestiaCP → WEB → เลือกโดเมน → Edit → PHP → ตั้งค่า (หรือแก้ `php.ini` ของ domain):
+
+```ini
+upload_max_filesize = 12M
+post_max_size = 14M
+```
+
+### Deploy อัตโนมัติ (ทางเลือก)
+
+เพิ่ม SSH key ของ CI แล้วรัน deploy script หลัง push:
+
+```yaml
+# .github/workflows/deploy-hestiacp.yml (ตัวอย่าง — สร้างเมื่อพร้อม)
+- name: Deploy
+  run: ssh user@server 'cd /home/user/web/workload.sru.ac.th && ./deploy/hestiacp-deploy.sh'
+```
+
+เก็บ credentials เป็น GitHub Secrets (`HESTIACP_SSH_HOST`, `HESTIACP_SSH_USER`, `HESTIACP_SSH_KEY`)
+
+### Checklist ก่อนเปิด production
+
+- [ ] `APP_DEBUG=false`, `APP_ENV=production`
+- [ ] SSL เปิดใช้งานแล้ว, `APP_URL` เป็น `https://`
+- [ ] UApp OAuth redirect URI ลงทะเบียนตรง `https://your-domain/auth/uapp/callback`
+- [ ] `php artisan migrate --force` รันสำเร็จ
+- [ ] `storage:link` สร้าง symlink แล้ว (ไฟล์หลักฐานอยู่ `storage/app/public/work-evidence/`)
+- [ ] ทดสอบ login, อัปโหลดหลักฐาน, ส่งออก Excel
+- [ ] **อย่า** รัน `db:seed` บน production (มีบัญชีทดสอบรหัส `password`)
+
 ## บัญชีทดสอบ (หลัง seed)
 
 รหัสผ่านทุกบัญชี: `password`

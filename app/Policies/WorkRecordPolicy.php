@@ -15,10 +15,6 @@ class WorkRecordPolicy
             return true;
         }
 
-        if ($user->isSupervisor() && $record->user->department === $user->department) {
-            return true;
-        }
-
         return $user->isHrOrAdmin();
     }
 
@@ -34,22 +30,11 @@ class WorkRecordPolicy
         return $this->update($user, $record);
     }
 
-    public function approve(User $user, WorkRecord $record): bool
+    public function withdraw(User $user, WorkRecord $record): bool
     {
-        if ($record->status !== WorkRecordStatus::Submitted) {
-            return false;
-        }
-
-        if ($user->isHrOrAdmin()) {
-            return true;
-        }
-
-        return $user->isSupervisor() && $record->user->department === $user->department;
-    }
-
-    public function reject(User $user, WorkRecord $record): bool
-    {
-        return $this->approve($user, $record);
+        return $record->user_id === $user->id
+            && $record->status === WorkRecordStatus::Submitted
+            && $record->evaluationPeriod?->status === PeriodStatus::Open;
     }
 
     public function delete(User $user, WorkRecord $record): bool

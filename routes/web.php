@@ -28,7 +28,6 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
         return match (true) {
             $user->isStaff() => redirect()->route('staff.records.index'),
-            $user->isSupervisor() => redirect()->route('supervisor.review.index'),
             default => redirect()->route('hr.dashboard'),
         };
     })->name('home');
@@ -43,10 +42,6 @@ Route::middleware(['auth', 'verified'])->group(function () {
             ->name('evidence.download');
         Route::get('evidence/{evidence}/preview', EvidencePreviewController::class)
             ->name('evidence.preview');
-    });
-
-    Route::middleware('role:supervisor')->prefix('supervisor')->name('supervisor.')->group(function () {
-        Route::livewire('review', 'pages::supervisor.review-queue')->name('review.index');
     });
 
     Route::middleware('role:hr,admin')->prefix('hr')->name('hr.')->group(function () {

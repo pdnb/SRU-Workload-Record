@@ -67,6 +67,8 @@ new class extends Component
 
     public bool $sidebarDrawerOpen = false;
 
+    public bool $withdrawConfirmOpen = false;
+
     public function mount(?WorkRecord $record = null): void
     {
         if ($record?->exists) {
@@ -95,6 +97,32 @@ new class extends Component
 
         $this->readOnly = false;
         $this->step = 1;
+    }
+
+    #[Computed]
+    public function canWithdraw(): bool
+    {
+        return $this->workRecord !== null
+            && $this->readOnly
+            && Gate::allows('withdraw', $this->workRecord);
+    }
+
+    #[Computed]
+    public function withdrawUnavailableMessage(): ?string
+    {
+        if (! $this->workRecord || ! $this->readOnly || $this->workRecord->user_id !== Auth::id()) {
+            return null;
+        }
+
+        if (Gate::allows('withdraw', $this->workRecord)) {
+            return null;
+        }
+
+        return match ($this->workRecord->status) {
+            WorkRecordStatus::Approved => 'บันทึกอนุมัติแล้ว ไม่สามารถถอนการส่งได้',
+            WorkRecordStatus::Submitted => 'รอบประเมินปิดแล้ว ไม่สามารถถอนการส่งได้',
+            default => null,
+        };
     }
 
     #[Computed]
@@ -552,11 +580,50 @@ new class extends Component
             'status' => WorkRecordStatus::Submitted,
             'submitted_at' => now(),
             'rejection_comment' => null,
+            'approved_at' => null,
         ]);
 
         Flux::toast('ส่งบันทึกภาระงานเรียบร้อยแล้ว');
 
         $this->redirect(route('staff.records.index'), navigate: true);
+    }
+
+    public function openWithdrawConfirm(): void
+    {
+        if (! $this->workRecord || ! Gate::allows('withdraw', $this->workRecord)) {
+            return;
+        }
+
+        $this->withdrawConfirmOpen = true;
+    }
+
+    public function cancelWithdrawConfirm(): void
+    {
+        $this->withdrawConfirmOpen = false;
+    }
+
+    public function confirmWithdraw(): void
+    {
+        $this->cancelWithdrawConfirm();
+        $this->withdraw();
+    }
+
+    public function withdraw(): void
+    {
+        if (! $this->workRecord) {
+            return;
+        }
+
+        Gate::authorize('withdraw', $this->workRecord);
+
+        $this->workRecord->update([
+            'status' => WorkRecordStatus::Draft,
+            'submitted_at' => null,
+        ]);
+
+        Flux::toast('ถอนการส่งแล้ว สามารถแก้ไขและส่งใหม่ได้');
+
+        $this->redirect(route('staff.records.edit', $this->workRecord), navigate: true);
     }
 
     public function openEntryModal(int $workloadId, ?int $index = null): void
@@ -1308,15 +1375,30 @@ new class extends Component
                 </div>
             @else
                 <flux:button :href="route('staff.records.index')" variant="ghost" wire:navigate>กลับ</flux:button>
-                <div class="flex flex-wrap gap-2">
-                    <flux:button wire:click="goToStep(2)" variant="filled" icon="clipboard-document-list">
-                        ดูรายการผลงาน
-                    </flux:button>
-                    @if ($workRecord)
-                        <flux:button :href="route('staff.records.print', $workRecord)" variant="primary" icon="printer" target="_blank">
-                            พิมพ์
-                        </flux:button>
+                <div class="flex flex-col items-end gap-2">
+                    @if ($this->withdrawUnavailableMessage)
+                        <p class="text-sm text-zinc-500 dark:text-zinc-400">{{ $this->withdrawUnavailableMessage }}</p>
                     @endif
+                    <div class="flex flex-wrap justify-end gap-2">
+                        <flux:button wire:click="goToStep(2)" variant="filled" icon="clipboard-document-list">
+                            ดูรายการผลงาน
+                        </flux:button>
+                        @if ($workRecord)
+                            <flux:button :href="route('staff.records.print', $workRecord)" variant="primary" icon="printer" target="_blank">
+                                พิมพ์
+                            </flux:button>
+                        @endif
+                        @if ($this->canWithdraw)
+                            <flux:button
+                                wire:click="openWithdrawConfirm"
+                                variant="danger"
+                                icon="arrow-uturn-left"
+                                wire:loading.attr="disabled"
+                            >
+                                ถอนการส่ง
+                            </flux:button>
+                        @endif
+                    </div>
                 </div>
             @endunless
         </div>
@@ -1389,6 +1471,25 @@ new class extends Component
                     wire:loading.attr="disabled"
                 >
                     ลบ
+                </flux:button>
+            </div>
+        </div>
+    </flux:modal>
+
+    <flux:modal wire:model="withdrawConfirmOpen" class="md:w-sm">
+        <div class="space-y-4">
+            <flux:heading size="lg">ถอนการส่ง</flux:heading>
+            <flux:subheading>
+                บันทึกจะกลับเป็นฉบับร่าง และลิงก์แชร์จะใช้งานไม่ได้จนกว่าจะส่งใหม่ ต้องการถอนการส่งใช่หรือไม่?
+            </flux:subheading>
+            <div class="flex justify-end gap-2">
+                <flux:button wire:click="cancelWithdrawConfirm" variant="ghost">ยกเลิก</flux:button>
+                <flux:button
+                    wire:click="confirmWithdraw"
+                    variant="danger"
+                    wire:loading.attr="disabled"
+                >
+                    ถอนการส่ง
                 </flux:button>
             </div>
         </div>

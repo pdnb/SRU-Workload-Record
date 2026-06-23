@@ -199,15 +199,20 @@ new class extends Component
 
         function renderStatusChart() {
             const data = $wire.chartData;
-            import('chart.js/auto').then(({ default: Chart }) => {
-                const canvas = document.getElementById('statusChart');
-                if (!canvas) return;
+            const Chart = window.Chart;
 
-                if (statusChart) {
-                    statusChart.destroy();
-                }
+            if (! Chart) {
+                return;
+            }
 
-                statusChart = new Chart(canvas, {
+            const canvas = document.getElementById('statusChart');
+            if (!canvas) return;
+
+            if (statusChart) {
+                statusChart.destroy();
+            }
+
+            statusChart = new Chart(canvas, {
                     type: 'bar',
                     data: {
                         labels: data.labels,
@@ -227,7 +232,6 @@ new class extends Component
                         },
                     },
                 });
-            });
         }
 
         renderStatusChart();

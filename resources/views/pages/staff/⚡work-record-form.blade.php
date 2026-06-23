@@ -634,7 +634,7 @@ new class extends Component
         $this->evidenceUploads = [];
 
         if ($index !== null && isset($this->entries[$workloadId][$index])) {
-            $this->modalEntry = $this->entries[$workloadId][$index];
+            $this->modalEntry = $this->copyEntryForModal($this->entries[$workloadId][$index]);
         } else {
             $this->modalEntry = [
                 'id' => null,
@@ -670,8 +670,16 @@ new class extends Component
         $this->deleteModalEntry();
     }
 
-    public function closeEntryModal(): void
+    public function closeEntryModal(bool $discardPendingUploads = true): void
     {
+        if ($discardPendingUploads && ! $this->readOnly) {
+            foreach ($this->entryEvidenceFiles($this->modalEntry) as $file) {
+                if (blank($file['id'] ?? null) && filled($path = $file['path'] ?? null)) {
+                    Storage::disk('public')->delete($path);
+                }
+            }
+        }
+
         $this->entryModalOpen = false;
         $this->deleteEntryConfirmOpen = false;
         $this->modalWorkloadId = null;
@@ -743,6 +751,42 @@ new class extends Component
         $this->modalEntry['evidence_files'] = array_values($files);
     }
 
+    public function updatedEvidenceUploads(): void
+    {
+        if ($this->readOnly || ($this->modalEntry['evidence_type'] ?? 'url') !== 'file' || $this->evidenceUploads === []) {
+            return;
+        }
+
+        if (! $this->workRecord && $this->selectedPeriodId) {
+            $this->saveDraft(showToast: false);
+        }
+
+        $this->persistPendingEvidenceUploads();
+    }
+
+    protected function persistPendingEvidenceUploads(): void
+    {
+        if ($this->evidenceUploads === [] || ! $this->workRecord) {
+            return;
+        }
+
+        $stored = $this->modalEvidenceFiles();
+
+        foreach ($this->evidenceUploads as $upload) {
+            $stored[] = [
+                'id' => null,
+                'path' => $upload->store(
+                    'work-evidence/'.$this->workRecord->id,
+                    'public',
+                ),
+                'filename' => $upload->getClientOriginalName(),
+            ];
+        }
+
+        $this->modalEntry['evidence_files'] = array_values($stored);
+        $this->evidenceUploads = [];
+    }
+
     public function saveModalEntry(): void
     {
         if ($this->readOnly) {
@@ -782,22 +826,9 @@ new class extends Component
         $entryData = $this->modalEntry;
 
         if (($entryData['evidence_type'] ?? 'url') === 'file' && $this->workRecord) {
-            $storedFiles = $this->modalEvidenceFiles();
-
-            foreach ($this->evidenceUploads as $upload) {
-                $storedFiles[] = [
-                    'id' => null,
-                    'path' => $upload->store(
-                        'work-evidence/'.$this->workRecord->id,
-                        'public',
-                    ),
-                    'filename' => $upload->getClientOriginalName(),
-                ];
-            }
-
-            $entryData['evidence_files'] = array_values($storedFiles);
+            $this->persistPendingEvidenceUploads();
+            $entryData['evidence_files'] = $this->modalEvidenceFiles();
             $entryData['evidence_type'] = 'file';
-            $this->evidenceUploads = [];
         } elseif (($entryData['evidence_type'] ?? 'url') === 'url') {
             $this->deleteStoredEvidence($entryData);
             $entryData['evidence'] = trim($entryData['evidence'] ?? '');
@@ -824,7 +855,7 @@ new class extends Component
         $this->selectedWorkloadId = $workloadId;
 
         Flux::toast('บันทึกผลงานแล้ว');
-        $this->closeEntryModal();
+        $this->closeEntryModal(discardPendingUploads: false);
     }
 
     public function deleteModalEntry(): void
@@ -910,9 +941,9 @@ new class extends Component
                 'result' => $entry->result ?? '',
                 'recorded_at' => $entry->created_at?->toIso8601String(),
                 'hours' => $entry->hours,
-                'evidence_type' => $entry->urlEvidence
-                    ? 'url'
-                    : ($entry->fileEvidences->isNotEmpty() ? 'file' : 'url'),
+                'evidence_type' => $entry->fileEvidences->isNotEmpty()
+                    ? 'file'
+                    : ($entry->urlEvidence ? 'url' : 'url'),
                 'evidence' => $entry->urlEvidence?->value ?? '',
                 'evidence_files' => $entry->fileEvidences->map(fn (WorkEntryEvidence $evidence) => [
                     'id' => $evidence->id,
@@ -1027,9 +1058,9 @@ new class extends Component
                         'sort_order' => $sortOrder,
                     ]);
                     $keptIds[] = $evidence->id;
-                }
 
-                continue;
+                    continue;
+                }
             }
 
             $evidence = $entry->evidences()->create([
@@ -1062,6 +1093,25 @@ new class extends Component
                 Storage::disk('public')->delete($path);
             }
         }
+    }
+
+    /**
+     * @param  array<string, mixed>  $entry
+     * @return array<string, mixed>
+     */
+    protected function copyEntryForModal(array $entry): array
+    {
+        $copy = $entry;
+        $copy['evidence_files'] = array_map(
+            static fn (array $file): array => [
+                'id' => $file['id'] ?? null,
+                'path' => $file['path'] ?? '',
+                'filename' => $file['filename'] ?? '',
+            ],
+            $this->entryEvidenceFiles($entry),
+        );
+
+        return $copy;
     }
 
     /**

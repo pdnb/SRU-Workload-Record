@@ -908,6 +908,7 @@ new class extends Component
                 'id' => $entry->id,
                 'detail' => $entry->detail,
                 'result' => $entry->result ?? '',
+                'recorded_at' => $entry->created_at?->toIso8601String(),
                 'hours' => $entry->hours,
                 'evidence_type' => $entry->urlEvidence
                     ? 'url'

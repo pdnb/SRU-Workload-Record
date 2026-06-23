@@ -509,15 +509,6 @@ new class extends Component
         );
     }
 
-    public function autoSave(): void
-    {
-        if ($this->readOnly || ! $this->selectedPeriodId || $this->entryModalOpen) {
-            return;
-        }
-
-        $this->saveDraft(showToast: false);
-    }
-
     public function saveDraft(bool $showToast = true): void
     {
         if ($this->readOnly) {
@@ -1157,7 +1148,6 @@ new class extends Component
     @if (! $readOnly)
         <div
             class="hidden md:block sticky top-20 z-40 -mx-4 mb-6 border-b border-zinc-200 bg-white/95 px-4 py-3 backdrop-blur sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8 dark:border-zinc-700 dark:bg-zinc-900/95"
-            @if ($step === 2) wire:poll.30s="autoSave" @endif
         >
             <div class="flex w-full flex-col gap-3">
                 <div class="flex flex-wrap items-center justify-between gap-4">
@@ -1178,7 +1168,6 @@ new class extends Component
                         <flux:badge color="green">
                             {{ $progress['filled'] }} ภาระงาน
                         </flux:badge>
-                        <span class="text-zinc-500">บันทึกอัตโนมัติทุก 30 วินาที</span>
                     </div>
                     <div class="flex gap-2">
                         <flux:button wire:click="saveDraft" variant="ghost" size="sm" wire:loading.attr="disabled">

@@ -350,6 +350,73 @@ new class extends Component
         );
     }
 
+    #[Computed]
+    public function step3ChartData(): array
+    {
+        $mainTotals = $this->flatWorkloads
+            ->groupBy('main_id')
+            ->map(function ($items) {
+                $total = (float) $items->sum('earned_score');
+                $max = $items->first()['main_max_score'] ?? null;
+
+                return $max !== null ? min($total, (float) $max) : $total;
+            });
+
+        $scoreByGroup = [];
+        $hoursByGroup = [];
+
+        foreach ($this->flatWorkloads->groupBy('group_id') as $items) {
+            $first = $items->first();
+            $label = trim(($first['group_number'] ?? '').' '.($first['group_name'] ?? ''));
+
+            $groupTotal = (float) $items
+                ->pluck('main_id')
+                ->unique()
+                ->sum(fn (int $mainId) => $mainTotals[$mainId] ?? 0.0);
+
+            $max = $first['group_max_score'] ?? null;
+
+            if ($max !== null) {
+                $groupTotal = min($groupTotal, (float) $max);
+            }
+
+            $scoreByGroup[] = [
+                'label' => $label,
+                'earned' => $groupTotal,
+                'max' => $max !== null ? (float) $max : null,
+            ];
+
+            $hours = (float) $items->sum('hours_sum');
+
+            if ($hours > 0) {
+                $hoursByGroup[] = [
+                    'label' => $label,
+                    'hours' => $hours,
+                ];
+            }
+        }
+
+        $progress = $this->workloadProgress;
+
+        return [
+            'hasEntries' => $this->totalEntriesCount > 0,
+            'scoreByGroup' => [
+                'labels' => array_column($scoreByGroup, 'label'),
+                'earned' => array_column($scoreByGroup, 'earned'),
+                'max' => array_map(fn (array $group) => $group['max'], $scoreByGroup),
+            ],
+            'hoursByGroup' => [
+                'labels' => array_column($hoursByGroup, 'label'),
+                'values' => array_column($hoursByGroup, 'hours'),
+            ],
+            'progress' => [
+                'filled' => $progress['filled'],
+                'empty' => max(0, $progress['total'] - $progress['filled']),
+                'percent' => $progress['percent'],
+            ],
+        ];
+    }
+
     public function selectPeriod(int $periodId): void
     {
         if ($this->readOnly) {
@@ -1350,6 +1417,49 @@ new class extends Component
             </div>
         @endif
 
+        @php $chartData = $this->step3ChartData; @endphp
+        <script type="application/json" id="step3ChartPayload">@json($chartData)</script>
+
+        <div class="mb-6 space-y-6">
+            <div class="rounded-xl border border-zinc-200 bg-white p-6 dark:border-zinc-700 dark:bg-zinc-800">
+                <flux:heading size="lg" class="mb-4">คะแนนตามกลุ่มภาระงาน</flux:heading>
+                <div wire:ignore class="relative h-72">
+                    <canvas id="step3ScoreChart"></canvas>
+                    @unless ($chartData['hasEntries'])
+                        <div class="absolute inset-0 flex items-center justify-center text-sm text-zinc-400">
+                            ยังไม่มีผลงาน
+                        </div>
+                    @endunless
+                </div>
+            </div>
+
+            <div class="grid gap-6 sm:grid-cols-2">
+                <div class="rounded-xl border border-zinc-200 bg-white p-6 dark:border-zinc-700 dark:bg-zinc-800">
+                    <flux:heading size="lg" class="mb-4">สัดส่วนงาน</flux:heading>
+                    <div wire:ignore class="relative h-56">
+                        <canvas id="step3HoursChart"></canvas>
+                        @unless ($chartData['hasEntries'])
+                            <div class="absolute inset-0 flex items-center justify-center text-sm text-zinc-400">
+                                ยังไม่มีผลงาน
+                            </div>
+                        @endunless
+                    </div>
+                </div>
+
+                <div class="rounded-xl border border-zinc-200 bg-white p-6 dark:border-zinc-700 dark:bg-zinc-800">
+                    <flux:heading size="lg" class="mb-4">ความคืบหน้าภาระงาน</flux:heading>
+                    <div wire:ignore class="relative h-56">
+                        <canvas id="step3ProgressChart"></canvas>
+                        @unless ($chartData['hasEntries'])
+                            <div class="absolute inset-0 flex items-center justify-center text-sm text-zinc-400">
+                                ยังไม่มีผลงาน
+                            </div>
+                        @endunless
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <div class="grid gap-6 lg:grid-cols-2">
             <div class="rounded-xl border border-zinc-200 bg-white p-6 dark:border-zinc-700 dark:bg-zinc-800">
                 <flux:heading size="lg" class="mb-4">สรุปผลงาน</flux:heading>
@@ -1534,4 +1644,177 @@ new class extends Component
             </div>
         </div>
     </flux:modal>
+
+    @script
+    <script>
+        let step3ScoreChart = null;
+        let step3HoursChart = null;
+        let step3ProgressChart = null;
+
+        const step3HoursColors = ['#60a5fa', '#34d399', '#fbbf24', '#fb7185', '#a78bfa', '#22d3ee'];
+
+        function destroyStep3Charts() {
+            [step3ScoreChart, step3HoursChart, step3ProgressChart].forEach((chart) => {
+                if (chart) {
+                    chart.destroy();
+                }
+            });
+            step3ScoreChart = null;
+            step3HoursChart = null;
+            step3ProgressChart = null;
+        }
+
+        function renderStep3Charts() {
+            if ($wire.step !== 3) {
+                destroyStep3Charts();
+
+                return;
+            }
+
+            const payloadEl = document.getElementById('step3ChartPayload');
+
+            if (! payloadEl) {
+                return;
+            }
+
+            const data = JSON.parse(payloadEl.textContent);
+            const Chart = window.Chart;
+
+            if (! Chart) {
+                return;
+            }
+
+            const scoreCanvas = document.getElementById('step3ScoreChart');
+            const hoursCanvas = document.getElementById('step3HoursChart');
+            const progressCanvas = document.getElementById('step3ProgressChart');
+
+            if (!scoreCanvas || !hoursCanvas || !progressCanvas) {
+                return;
+            }
+
+            destroyStep3Charts();
+
+            const score = data.scoreByGroup ?? { labels: [], earned: [], max: [] };
+            const hasMax = (score.max ?? []).some((value) => value !== null);
+            const scoreDatasets = [];
+
+            if (hasMax) {
+                scoreDatasets.push({
+                    label: 'คะแนนสูงสุด',
+                    data: score.max.map((value) => value ?? 0),
+                    backgroundColor: '#e4e4e7',
+                    borderRadius: 6,
+                    order: 2,
+                });
+            }
+
+            scoreDatasets.push({
+                label: 'คะแนนที่ได้',
+                data: score.earned,
+                backgroundColor: '#a855f7',
+                borderRadius: 6,
+                order: 1,
+            });
+
+            step3ScoreChart = new Chart(scoreCanvas, {
+                type: 'bar',
+                data: {
+                    labels: score.labels,
+                    datasets: scoreDatasets,
+                },
+                options: {
+                    indexAxis: 'y',
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: hasMax },
+                        tooltip: {
+                            callbacks: {
+                                label: (ctx) => `${ctx.dataset.label}: ${ctx.parsed.x.toFixed(2)} คะแนน`,
+                            },
+                        },
+                    },
+                    scales: {
+                        x: { beginAtZero: true },
+                    },
+                },
+            });
+
+            const hours = data.hoursByGroup ?? { labels: [], values: [] };
+
+            step3HoursChart = new Chart(hoursCanvas, {
+                type: 'doughnut',
+                data: {
+                    labels: hours.labels,
+                    datasets: [{
+                        data: hours.values,
+                        backgroundColor: hours.values.map((_, i) => step3HoursColors[i % step3HoursColors.length]),
+                        borderWidth: 0,
+                    }],
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { position: 'bottom' },
+                        tooltip: {
+                            callbacks: {
+                                label: (ctx) => `${ctx.label}: ${ctx.parsed.toFixed(1)} งาน`,
+                            },
+                        },
+                    },
+                },
+            });
+
+            const progress = data.progress ?? { filled: 0, empty: 0, percent: 0 };
+
+            step3ProgressChart = new Chart(progressCanvas, {
+                type: 'doughnut',
+                data: {
+                    labels: ['มีผลงานแล้ว', 'ยังไม่มีผลงาน'],
+                    datasets: [{
+                        data: [progress.filled, progress.empty],
+                        backgroundColor: ['#4ade80', '#e4e4e7'],
+                        borderWidth: 0,
+                    }],
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    cutout: '60%',
+                    plugins: {
+                        legend: { position: 'bottom' },
+                        tooltip: {
+                            callbacks: {
+                                label: (ctx) => `${ctx.label}: ${ctx.parsed} ภาระงาน`,
+                            },
+                        },
+                    },
+                },
+            });
+        }
+
+        function scheduleStep3Charts() {
+            setTimeout(() => renderStep3Charts(), 50);
+        }
+
+        if ($wire.step === 3) {
+            scheduleStep3Charts();
+        }
+
+        $wire.$watch('step', (step) => {
+            if (step === 3) {
+                scheduleStep3Charts();
+            } else {
+                destroyStep3Charts();
+            }
+        });
+
+        $wire.$watch('totalEntriesCount', () => {
+            if ($wire.step === 3) {
+                scheduleStep3Charts();
+            }
+        });
+    </script>
+    @endscript
 </div>

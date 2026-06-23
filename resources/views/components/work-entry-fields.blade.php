@@ -28,7 +28,7 @@
         <flux:label>รายละเอียดการดำเนินงาน <span class="text-red-500">*</span></flux:label>
         <flux:textarea
             wire:model="modalEntry.detail"
-            rows="4"
+            rows="6"
             placeholder="อธิบายรายละเอียดการดำเนินงานอย่างน้อย 10 ตัวอักษร"
             :disabled="$readonly"
         />

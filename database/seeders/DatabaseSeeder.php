@@ -12,6 +12,8 @@ class DatabaseSeeder extends Seeder
             FiscalYearSeeder::class,
             WorkloadStructureSeeder::class,
             UserSeeder::class,
+            // WorkRecordSeeder::class,
+            // WorkEntrySeeder::class,
         ]);
     }
 }

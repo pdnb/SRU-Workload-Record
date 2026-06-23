@@ -132,12 +132,25 @@
                                 wire:click="openEntryModal({{ $workloadId }}, {{ $index }})"
                                 class="min-w-0 flex-1 cursor-pointer text-left hover:text-blue-600"
                             >
-                                <span class="line-clamp-2 font-medium">{{ Str::limit($entry['detail'], 80) }}</span>
+                                <span class="line-clamp-2 font-medium">{{ Str::limit($entry['detail'], 200) }}</span>
+                                @if (filled($entry['recorded_at'] ?? null) || filled($entry['result'] ?? null) || filled($entry['hours'] ?? null))
+                                    <div class="mt-1 flex flex-wrap gap-1">
+                                        @if (filled($entry['recorded_at'] ?? null))
+                                            @php
+                                                $recordedAt = \Illuminate\Support\Carbon::parse($entry['recorded_at']);
+                                            @endphp
+                                            <flux:badge size="sm">
+                                                {{ $recordedAt->format('d/m/Y') }}
+                                            </flux:badge>
+                                        @endif
+                                        @if (filled($entry['hours'] ?? null))
+                                            <flux:badge size="sm">{{ $entry['hours'] }} งาน</flux:badge>
+                                        @endif
+                                    </div>
+                                @endif
+
                                 @if (filled($entry['result'] ?? null))
                                     <span class="mt-1 block line-clamp-1 text-zinc-500">{{ Str::limit($entry['result'], 60) }}</span>
-                                @endif
-                                @if (filled($entry['hours'] ?? null))
-                                    <span class="mt-1 block text-zinc-500">{{ $entry['hours'] }} งาน</span>
                                 @endif
                             </button>
                             @unless ($readOnly)

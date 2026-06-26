@@ -1,8 +1,11 @@
 <?php
 
+use App\Actions\SyncCollaboratorWorkEntries;
 use App\Data\WorkRecordScoreSummary;
+use App\Enums\UserRole;
 use App\Enums\WorkRecordStatus;
 use App\Models\EvaluationPeriod;
+use App\Models\User;
 use App\Models\WorkEntry;
 use App\Models\WorkEntryEvidence;
 use App\Models\WorkRecord;
@@ -14,6 +17,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
 use Livewire\Attributes\Computed;
 use Livewire\Component;
 use Livewire\WithFileUploads;
@@ -41,6 +45,8 @@ new class extends Component
 
     public bool $deleteEntryConfirmOpen = false;
 
+    public bool $modalReadOnly = false;
+
     public ?int $modalWorkloadId = null;
 
     public ?int $modalEntryIndex = null;
@@ -54,6 +60,7 @@ new class extends Component
         'evidence_type' => 'url',
         'evidence' => '',
         'evidence_files' => [],
+        'collaborator_ids' => [],
     ];
 
     /** @var array<int, \Livewire\Features\SupportFileUploads\TemporaryUploadedFile> */
@@ -62,6 +69,8 @@ new class extends Component
     public ?int $selectedWorkloadId = null;
 
     public string $workloadSearch = '';
+
+    public string $collaboratorSearch = '';
 
     public string $workloadFilter = 'all';
 
@@ -77,6 +86,8 @@ new class extends Component
             $this->workRecord = $record->load([
                 'evaluationPeriod.fiscalYear',
                 'workEntries.evidences',
+                'workEntries.mirroredEntries.workRecord.user',
+                'workEntries.sourceEntry.workRecord.user',
             ]);
 
             $this->selectedPeriodId = $record->evaluation_period_id;
@@ -123,6 +134,74 @@ new class extends Component
             WorkRecordStatus::Submitted => 'รอบประเมินปิดแล้ว ไม่สามารถถอนการส่งได้',
             default => null,
         };
+    }
+
+    #[Computed]
+    public function collaboratorSearchResults()
+    {
+        if (mb_strlen(trim($this->collaboratorSearch)) < 2) {
+            return collect();
+        }
+
+        $term = trim($this->collaboratorSearch);
+        $selected = $this->modalEntry['collaborator_ids'] ?? [];
+
+        return User::query()
+            ->where('role', UserRole::Staff)
+            ->where('id', '!=', Auth::id())
+            ->when($selected !== [], fn ($query) => $query->whereNotIn('id', $selected))
+            ->where(fn ($query) => $query
+                ->where('name', 'like', "%{$term}%")
+                ->orWhere('email', 'like', "%{$term}%"))
+            ->orderBy('name')
+            ->limit(10)
+            ->get(['id', 'name', 'department']);
+    }
+
+    #[Computed]
+    public function modalCollaborators()
+    {
+        $ids = $this->modalEntry['collaborator_ids'] ?? [];
+
+        if ($ids === []) {
+            return collect();
+        }
+
+        return User::query()
+            ->whereIn('id', $ids)
+            ->orderBy('name')
+            ->get(['id', 'name', 'department']);
+    }
+
+    public function addCollaborator(int $userId): void
+    {
+        if ($this->readOnly || $this->modalReadOnly) {
+            return;
+        }
+
+        $ids = $this->modalEntry['collaborator_ids'] ?? [];
+
+        if (! in_array($userId, $ids, true)) {
+            $ids[] = $userId;
+        }
+
+        $this->modalEntry['collaborator_ids'] = $ids;
+        $this->collaboratorSearch = '';
+        unset($this->collaboratorSearchResults, $this->modalCollaborators);
+    }
+
+    public function removeCollaborator(int $userId): void
+    {
+        if ($this->readOnly || $this->modalReadOnly) {
+            return;
+        }
+
+        $this->modalEntry['collaborator_ids'] = array_values(array_filter(
+            $this->modalEntry['collaborator_ids'] ?? [],
+            fn ($id) => (int) $id !== $userId,
+        ));
+
+        unset($this->modalCollaborators, $this->collaboratorSearchResults);
     }
 
     #[Computed]
@@ -690,9 +769,11 @@ new class extends Component
         $this->modalWorkloadId = $workloadId;
         $this->modalEntryIndex = $index;
         $this->evidenceUploads = [];
+        $this->collaboratorSearch = '';
 
         if ($index !== null && isset($this->entries[$workloadId][$index])) {
             $this->modalEntry = $this->copyEntryForModal($this->entries[$workloadId][$index]);
+            $this->modalReadOnly = $this->readOnly || ! empty($this->entries[$workloadId][$index]['is_mirror']);
         } else {
             $this->modalEntry = [
                 'id' => null,
@@ -702,7 +783,10 @@ new class extends Component
                 'evidence_type' => 'url',
                 'evidence' => '',
                 'evidence_files' => [],
+                'collaborator_ids' => [],
+                'is_mirror' => false,
             ];
+            $this->modalReadOnly = $this->readOnly;
         }
 
         $this->entryModalOpen = true;
@@ -710,7 +794,7 @@ new class extends Component
 
     public function openDeleteEntryConfirm(): void
     {
-        if ($this->readOnly || $this->modalEntryIndex === null || ! $this->modalWorkloadId) {
+        if ($this->readOnly || $this->modalReadOnly || $this->modalEntryIndex === null || ! $this->modalWorkloadId) {
             return;
         }
 
@@ -742,6 +826,8 @@ new class extends Component
         $this->deleteEntryConfirmOpen = false;
         $this->modalWorkloadId = null;
         $this->modalEntryIndex = null;
+        $this->modalReadOnly = false;
+        $this->collaboratorSearch = '';
         $this->modalEntry = [
             'id' => null,
             'detail' => '',
@@ -750,6 +836,7 @@ new class extends Component
             'evidence_type' => 'url',
             'evidence' => '',
             'evidence_files' => [],
+            'collaborator_ids' => [],
         ];
         $this->evidenceUploads = [];
         $this->resetValidation();
@@ -847,7 +934,7 @@ new class extends Component
 
     public function saveModalEntry(): void
     {
-        if ($this->readOnly) {
+        if ($this->readOnly || $this->modalReadOnly) {
             $this->closeEntryModal();
 
             return;
@@ -856,6 +943,12 @@ new class extends Component
         $rules = [
             'modalEntry.detail' => ['required', 'string', 'min:10'],
             'modalEntry.hours' => ['nullable', 'numeric', 'min:1', 'max:999'],
+            'modalEntry.collaborator_ids' => ['nullable', 'array'],
+            'modalEntry.collaborator_ids.*' => [
+                'integer',
+                Rule::exists('users', 'id')->where('role', UserRole::Staff->value),
+                Rule::notIn([Auth::id()]),
+            ],
         ];
 
         if (($this->modalEntry['evidence_type'] ?? 'url') === 'url') {
@@ -918,7 +1011,7 @@ new class extends Component
 
     public function deleteModalEntry(): void
     {
-        if ($this->readOnly || $this->modalEntryIndex === null || ! $this->modalWorkloadId) {
+        if ($this->readOnly || $this->modalReadOnly || $this->modalEntryIndex === null || ! $this->modalWorkloadId) {
             return;
         }
 
@@ -941,10 +1034,17 @@ new class extends Component
         }
 
         $entry = $this->entries[$workloadId][$index];
-        $this->deleteStoredEvidence($entry);
+
+        if (! empty($entry['is_mirror'])) {
+            Flux::toast('ไม่สามารถลบผลงานร่วมได้', variant: 'danger');
+
+            return;
+        }
 
         if ($entryId = $entry['id'] ?? null) {
             WorkEntry::find($entryId)?->delete();
+        } else {
+            $this->deleteStoredEvidence($entry);
         }
 
         unset($this->entries[$workloadId][$index]);
@@ -973,10 +1073,16 @@ new class extends Component
             return;
         }
 
-        $this->deleteStoredEvidence($this->entries[$workloadId][$index]);
+        if (! empty($this->entries[$workloadId][$index]['is_mirror'])) {
+            Flux::toast('ไม่สามารถลบผลงานร่วมได้', variant: 'danger');
+
+            return;
+        }
 
         if ($entryId = $this->entries[$workloadId][$index]['id'] ?? null) {
             WorkEntry::find($entryId)?->delete();
+        } else {
+            $this->deleteStoredEvidence($this->entries[$workloadId][$index]);
         }
 
         unset($this->entries[$workloadId][$index]);
@@ -991,9 +1097,14 @@ new class extends Component
         $this->entries = [];
 
         foreach ($this->workRecord->workEntries as $entry) {
-            $entry->loadMissing(['fileEvidences', 'urlEvidence']);
+            $entry->loadMissing([
+                'fileEvidences',
+                'urlEvidence',
+                'mirroredEntries.workRecord.user',
+                'sourceEntry.workRecord.user',
+            ]);
 
-            $this->entries[$entry->workload_id][] = [
+            $data = [
                 'id' => $entry->id,
                 'detail' => $entry->detail,
                 'result' => $entry->result ?? '',
@@ -1009,6 +1120,23 @@ new class extends Component
                     'filename' => $evidence->displayName(),
                 ])->values()->all(),
             ];
+
+            if ($entry->isMirror()) {
+                $data['is_mirror'] = true;
+                $data['shared_from_name'] = $entry->sourceEntry?->workRecord?->user?->name ?? '';
+            } else {
+                $data['is_mirror'] = false;
+                $data['collaborator_ids'] = $entry->mirroredEntries
+                    ->map(fn (WorkEntry $mirror) => $mirror->workRecord->user_id)
+                    ->values()
+                    ->all();
+                $data['collaborator_names'] = $entry->mirroredEntries
+                    ->map(fn (WorkEntry $mirror) => $mirror->workRecord->user->name)
+                    ->values()
+                    ->all();
+            }
+
+            $this->entries[$entry->workload_id][] = $data;
         }
     }
 
@@ -1019,10 +1147,19 @@ new class extends Component
         }
 
         $keptIds = [];
+        $skippedCollaborators = [];
 
         foreach ($this->entries as $workloadId => $items) {
             foreach ($items as $sortOrder => $data) {
                 if (blank($data['detail'] ?? null)) {
+                    continue;
+                }
+
+                if (! empty($data['is_mirror'])) {
+                    if ($entryId = $data['id'] ?? null) {
+                        $keptIds[] = $entryId;
+                    }
+
                     continue;
                 }
 
@@ -1036,25 +1173,54 @@ new class extends Component
 
                 if ($entryId = $data['id'] ?? null) {
                     $entry = WorkEntry::find($entryId);
-                    if ($entry) {
+                    if ($entry && ! $entry->isMirror()) {
                         $entry->update($payload);
                         $this->syncEntryEvidences($entry, $data);
                         $keptIds[] = $entry->id;
+
+                        $result = app(SyncCollaboratorWorkEntries::class)(
+                            $entry,
+                            $data['collaborator_ids'] ?? [],
+                        );
+                        $skippedCollaborators = array_merge($skippedCollaborators, $result['skipped']);
                     }
                 } else {
                     $entry = $this->workRecord->workEntries()->create($payload);
                     $this->syncEntryEvidences($entry, $data);
                     $keptIds[] = $entry->id;
+
+                    $result = app(SyncCollaboratorWorkEntries::class)(
+                        $entry,
+                        $data['collaborator_ids'] ?? [],
+                    );
+                    $skippedCollaborators = array_merge($skippedCollaborators, $result['skipped']);
                 }
             }
         }
 
         $this->workRecord->workEntries()
+            ->whereNull('source_work_entry_id')
             ->whereNotIn('id', $keptIds)
             ->get()
             ->each(fn (WorkEntry $entry) => $entry->delete());
 
-        $this->workRecord->load(['workEntries.evidences']);
+        if ($skippedCollaborators !== []) {
+            $names = collect($skippedCollaborators)
+                ->unique('id')
+                ->pluck('name')
+                ->implode(', ');
+
+            Flux::toast(
+                "ไม่สามารถเพิ่มผลงานให้: {$names} (ส่งบันทึกแล้ว)",
+                variant: 'warning',
+            );
+        }
+
+        $this->workRecord->load([
+            'workEntries.evidences',
+            'workEntries.mirroredEntries.workRecord.user',
+            'workEntries.sourceEntry.workRecord.user',
+        ]);
         $this->loadEntriesFromRecord();
         $this->bustWorkloadComputeds();
     }
@@ -1576,13 +1742,13 @@ new class extends Component
             </div>
 
             <x-work-entry-fields
-                :readonly="$readOnly"
+                :readonly="$readOnly || $modalReadOnly"
                 :modal-entry="$modalEntry"
                 :evidence-uploads="$evidenceUploads"
             />
 
             <div class="flex justify-between gap-2">
-                @if (! $readOnly && $modalEntryIndex !== null)
+                @if (! $readOnly && $modalEntryIndex !== null && ! ($modalEntry['is_mirror'] ?? false))
                     <flux:button
                         type="button"
                         wire:click="openDeleteEntryConfirm"
@@ -1597,9 +1763,9 @@ new class extends Component
 
                 <div class="flex gap-2">
                     <flux:button wire:click="closeEntryModal" variant="ghost">
-                        {{ $readOnly ? 'ปิด' : 'ยกเลิก' }}
+                        {{ ($readOnly || $modalReadOnly) ? 'ปิด' : 'ยกเลิก' }}
                     </flux:button>
-                    @unless ($readOnly)
+                    @unless ($readOnly || $modalReadOnly)
                         <flux:button wire:click="saveModalEntry" variant="primary" wire:loading.attr="disabled">
                             บันทึก
                         </flux:button>

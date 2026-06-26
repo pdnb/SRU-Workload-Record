@@ -26,6 +26,6 @@ class DashboardTest extends TestCase
         $response = $this->get('/dashboard');
 
         $response->assertRedirect('/home');
-        $this->get('/home')->assertRedirect(route('staff.records.index'));
+        $this->get('/home')->assertRedirect(route('staff.dashboard'));
     }
 }

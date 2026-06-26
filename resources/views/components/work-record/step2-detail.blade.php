@@ -145,13 +145,6 @@
                                 class="min-w-0 flex-1 cursor-pointer text-left hover:text-blue-600"
                             >
                                 <span class="line-clamp-2 font-medium">{{ Str::limit($entry['detail'], 200) }}</span>
-                                @if ($isMirror)
-                                    <div class="mt-1">
-                                        <flux:badge size="sm" color="zinc">
-                                            ผลงานร่วมจาก {{ $entry['shared_from_name'] ?? 'บุคลากร' }}
-                                        </flux:badge>
-                                    </div>
-                                @endif
                                 @if (filled($entry['recorded_at'] ?? null) || filled($entry['result'] ?? null) || filled($entry['hours'] ?? null))
                                     <div class="mt-1 flex flex-wrap gap-1">
                                         @if (filled($entry['recorded_at'] ?? null))
@@ -173,9 +166,17 @@
                                 @endif
 
                                 @if (! $isMirror && filled($entry['collaborator_names'] ?? []))
-                                    <span class="mt-1 block text-xs text-zinc-500">
-                                        ผู้ร่วมงาน: {{ implode(', ', $entry['collaborator_names']) }}
-                                    </span>
+                                    <div class="mt-1 block">
+                                        <flux:badge size="sm">ผู้ร่วมงาน: {{ implode(', ', $entry['collaborator_names']) }}</flux:badge>
+                                    </div>
+                                @endif
+
+                                @if ($isMirror)
+                                    <div class="mt-1 block">
+                                        <flux:badge size="sm" color="zinc">
+                                            ผลงานร่วมจาก {{ $entry['shared_from_name'] ?? 'เพื่อนร่วมงาน' }}
+                                        </flux:badge>
+                                    </div>
                                 @endif
                             </button>
                             @unless ($readOnly || $isMirror)

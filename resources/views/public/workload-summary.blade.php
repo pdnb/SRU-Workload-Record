@@ -94,7 +94,7 @@
     <div class="container">
         <div class="header">
             <h1>สรุปผลงานภาระงาน</h1>
-            <p class="subtitle">ระบบบันทึกภาระงาน</p>
+            <p class="subtitle">ระบบบันทึกการปฏิบัติงาน</p>
             <div class="meta">
                 <p><strong>{{ $record->user->name }}</strong></p>
                 @if ($record->user->position || $record->user->department)
@@ -168,7 +168,7 @@
         </div>
 
         <div class="footer">
-            สรุปจากระบบบันทึกภาระงาน — ลิงก์นี้แชร์โดยเจ้าของบันทึก
+            สรุปจากระบบบันทึกการปฏิบัติงาน — ลิงก์นี้แชร์โดยเจ้าของบันทึก
         </div>
     </div>
 </body>

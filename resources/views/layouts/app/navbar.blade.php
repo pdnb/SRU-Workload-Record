@@ -6,7 +6,7 @@
     <div class="flex w-full items-center justify-between gap-4 px-4 py-3 sm:px-6 lg:px-8">
         <div class="flex min-w-0 flex-1 items-center gap-6">
             <a href="{{ $user->isStaff() ? route('staff.records.index') : route('hr.dashboard') }}" class="cursor-pointer shrink-0 text-lg font-semibold text-zinc-900 dark:text-white" wire:navigate>
-                ระบบบันทึกภาระงาน
+                ระบบบันทึกการปฏิบัติงาน
             </a>
 
             <flux:navbar class="hidden md:flex">

@@ -46,6 +46,17 @@
                 @if ($active['hours_sum'] > 0)
                     <flux:badge size="sm" color="zinc">{{ number_format($active['hours_sum'], 1) }} งาน</flux:badge>
                 @endif
+                @unless ($readOnly)
+                    <flux:button
+                        wire:click="openEntryModal({{ $workloadId }})"
+                        variant="primary"
+                        size="sm"
+                        icon="plus"
+                        class="shrink-0"
+                    >
+                        บันทึกงาน
+                    </flux:button>
+                @endunless
             </div>
 
             @if ($canShare && count($workloadEntries))
@@ -176,10 +187,10 @@
                     @endforeach
                 </ul>
             @else
-                <x-empty-state icon="document-text" message="ยังไม่มีผลงานในภาระงานนี้" class="py-8">
+                <x-empty-state icon="document-text" message="ยังไม่บันทึกงานในภาระงานนี้" class="py-8">
                     @unless ($readOnly)
                         <flux:button wire:click="openEntryModal({{ $workloadId }})" variant="primary" size="sm" icon="plus">
-                            เพิ่มผลงานแรก
+                            บันทึกงานแรก
                         </flux:button>
                     @endunless
                 </x-empty-state>
@@ -188,7 +199,7 @@
             @if (count($workloadEntries) && ! $readOnly)
                 <div class="mt-4">
                     <flux:button wire:click="openEntryModal({{ $workloadId }})" variant="primary" size="sm" icon="plus">
-                        เพิ่มผลงาน
+                        บันทึกงาน
                     </flux:button>
                 </div>
             @endif

@@ -708,7 +708,7 @@ new class extends Component
         Gate::authorize('submit', $this->workRecord);
 
         if ($this->totalEntriesCount === 0) {
-            Flux::toast('กรุณาเพิ่มผลงานอย่างน้อย 1 รายการ', variant: 'danger');
+            Flux::toast('กรุณาบันทึกงานอย่างน้อย 1 รายการ', variant: 'danger');
 
             return;
         }
@@ -1211,7 +1211,7 @@ new class extends Component
                 ->implode(', ');
 
             Flux::toast(
-                "ไม่สามารถเพิ่มผลงานให้: {$names} (ส่งบันทึกแล้ว)",
+                "ไม่สามารถบันทึกงานให้: {$names} (ส่งบันทึกแล้ว)",
                 variant: 'warning',
             );
         }
@@ -1415,7 +1415,7 @@ new class extends Component
                     <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-4">
                         <div class="min-w-0 flex-1">
                             <div class="mb-1 flex justify-between text-xs text-zinc-500">
-                                <span>ความคืบหน้าภาระงานที่มีผลงานแล้ว</span>
+                                <span>ความคืบหน้าภาระงานที่บันทึกงานแล้ว</span>
                                 <span>{{ $progress['percent'] }}%</span>
                             </div>
                             <div class="h-2 overflow-hidden rounded-full bg-zinc-200 dark:bg-zinc-700">
@@ -1431,7 +1431,7 @@ new class extends Component
                                 wire:click="setWorkloadFilter('empty')"
                                 class="cursor-pointer shrink-0 text-xs text-blue-600 hover:underline dark:text-blue-400"
                             >
-                                ดูเฉพาะที่ยังไม่มีผลงาน ({{ $progress['total'] - $progress['filled'] }})
+                                ดูเฉพาะที่ยังไม่บันทึกงาน ({{ $progress['total'] - $progress['filled'] }})
                             </button>
                         @endif
                     </div>
@@ -1593,7 +1593,7 @@ new class extends Component
                     <canvas id="step3ScoreChart"></canvas>
                     @unless ($chartData['hasEntries'])
                         <div class="absolute inset-0 flex items-center justify-center text-sm text-zinc-400">
-                            ยังไม่มีผลงาน
+                            ยังไม่บันทึกงาน
                         </div>
                     @endunless
                 </div>
@@ -1606,7 +1606,7 @@ new class extends Component
                         <canvas id="step3HoursChart"></canvas>
                         @unless ($chartData['hasEntries'])
                             <div class="absolute inset-0 flex items-center justify-center text-sm text-zinc-400">
-                                ยังไม่มีผลงาน
+                                ยังไม่บันทึกงาน
                             </div>
                         @endunless
                     </div>
@@ -1618,7 +1618,7 @@ new class extends Component
                         <canvas id="step3ProgressChart"></canvas>
                         @unless ($chartData['hasEntries'])
                             <div class="absolute inset-0 flex items-center justify-center text-sm text-zinc-400">
-                                ยังไม่มีผลงาน
+                                ยังไม่บันทึกงาน
                             </div>
                         @endunless
                     </div>
@@ -1730,7 +1730,7 @@ new class extends Component
                     @elseif ($modalEntryIndex !== null)
                         แก้ไขผลงาน
                     @else
-                        เพิ่มผลงาน
+                        บันทึกงาน
                     @endif
                 </flux:heading>
                 @if ($modalWorkloadId)
@@ -1937,7 +1937,7 @@ new class extends Component
             step3ProgressChart = new Chart(progressCanvas, {
                 type: 'doughnut',
                 data: {
-                    labels: ['มีผลงานแล้ว', 'ยังไม่มีผลงาน'],
+                    labels: ['บันทึกงานแล้ว', 'ยังไม่บันทึกงาน'],
                     datasets: [{
                         data: [progress.filled, progress.empty],
                         backgroundColor: ['#4ade80', '#e4e4e7'],

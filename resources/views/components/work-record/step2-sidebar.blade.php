@@ -41,14 +41,14 @@
                 size="xs"
                 variant="{{ $workloadFilter === 'filled' ? 'primary' : 'ghost' }}"
             >
-                มีผลงานแล้ว
+                บันทึกงานแล้ว
             </flux:button>
             <flux:button
                 wire:click="setWorkloadFilter('empty')"
                 size="xs"
                 variant="{{ $workloadFilter === 'empty' ? 'primary' : 'ghost' }}"
             >
-                ยังไม่มีผลงาน
+                ยังไม่บันทึกงาน
             </flux:button>
         </div>
     </div>

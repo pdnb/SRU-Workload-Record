@@ -15,8 +15,8 @@
                         <x-app-logo-icon class="size-7 fill-current text-white" />
                     </span>
                     <div>
-                        <p class="text-sm font-medium text-blue-100">มหาวิทยาลัยราชภัฏสุราษฎร์ธานี</p>
-                        <p class="text-lg font-semibold leading-tight">ระบบบันทึกภาระงาน</p>
+                        <p class="text-sm font-medium text-blue-100">SRU i-Jobs</p>
+                        <p class="text-lg font-semibold leading-tight">ระบบบันทึกการปฏิบัติงาน</p>
                     </div>
                 </div>
 
@@ -60,7 +60,7 @@
                         </span>
                         <div>
                             <p class="text-xs text-zinc-500 dark:text-zinc-400">SRU Workload</p>
-                            <p class="text-sm font-semibold text-zinc-900 dark:text-white">ระบบบันทึกภาระงาน</p>
+                            <p class="text-sm font-semibold text-zinc-900 dark:text-white">ระบบบันทึกการปฏิบัติงาน</p>
                         </div>
                     </div>
                     @include('partials.theme-toggle')

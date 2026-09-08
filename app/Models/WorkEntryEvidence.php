@@ -29,7 +29,17 @@ class WorkEntryEvidence extends Model
     protected static function booted(): void
     {
         static::deleting(function (WorkEntryEvidence $evidence) {
-            if ($evidence->type === EvidenceType::File) {
+            if ($evidence->type !== EvidenceType::File) {
+                return;
+            }
+
+            $stillUsed = static::query()
+                ->where('type', EvidenceType::File)
+                ->where('value', $evidence->value)
+                ->where('id', '!=', $evidence->id)
+                ->exists();
+
+            if (! $stillUsed) {
                 Storage::disk('public')->delete($evidence->value);
             }
         });

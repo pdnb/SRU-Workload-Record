@@ -39,6 +39,6 @@ class SupervisorRemovalTest extends TestCase
 
         $this->actingAs($user)
             ->get('/home')
-            ->assertRedirect(route('staff.records.index'));
+            ->assertRedirect(route('staff.dashboard'));
     }
 }

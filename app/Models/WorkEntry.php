@@ -13,6 +13,7 @@ class WorkEntry extends Model
 {
     protected $fillable = [
         'work_record_id',
+        'source_work_entry_id',
         'workload_id',
         'detail',
         'result',
@@ -30,6 +31,21 @@ class WorkEntry extends Model
     public function workRecord(): BelongsTo
     {
         return $this->belongsTo(WorkRecord::class);
+    }
+
+    public function sourceEntry(): BelongsTo
+    {
+        return $this->belongsTo(WorkEntry::class, 'source_work_entry_id');
+    }
+
+    public function mirroredEntries(): HasMany
+    {
+        return $this->hasMany(WorkEntry::class, 'source_work_entry_id');
+    }
+
+    public function isMirror(): bool
+    {
+        return $this->source_work_entry_id !== null;
     }
 
     public function workload(): BelongsTo

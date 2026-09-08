@@ -124,7 +124,7 @@ class WorkRecordStep3ChartTest extends TestCase
         $this->assertSame(0, $data['progress']['filled']);
 
         $component
-            ->assertSee('ยังไม่มีผลงาน')
+            ->assertSee('ยังไม่บันทึกงาน')
             ->assertSeeHtml('id="step3ScoreChart"');
     }
 }

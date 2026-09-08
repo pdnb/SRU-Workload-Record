@@ -5,12 +5,15 @@
 <header class="sticky top-0 z-50 w-full border-b border-zinc-200 bg-white/95 backdrop-blur dark:border-zinc-700 dark:bg-zinc-900/95">
     <div class="flex w-full items-center justify-between gap-4 px-4 py-3 sm:px-6 lg:px-8">
         <div class="flex min-w-0 flex-1 items-center gap-6">
-            <a href="{{ $user->isStaff() ? route('staff.records.index') : route('hr.dashboard') }}" class="cursor-pointer shrink-0 text-lg font-semibold text-zinc-900 dark:text-white" wire:navigate>
-                ระบบบันทึกภาระงาน
+            <a href="{{ $user->isStaff() ? route('staff.dashboard') : route('hr.dashboard') }}" class="cursor-pointer shrink-0 text-lg font-semibold text-zinc-900 dark:text-white" wire:navigate>
+                ระบบบันทึกการปฏิบัติงาน
             </a>
 
             <flux:navbar class="hidden md:flex">
                 @if ($user->isStaff())
+                    <flux:navbar.item :href="route('staff.dashboard')" :current="request()->routeIs('staff.dashboard')" wire:navigate>
+                        แดชบอร์ด
+                    </flux:navbar.item>
                     <flux:navbar.item :href="route('staff.records.index')" :current="request()->routeIs('staff.records.*')" wire:navigate>
                         บันทึกของฉัน
                     </flux:navbar.item>
@@ -52,6 +55,7 @@
 
     <nav class="flex w-full gap-1 overflow-x-auto border-t border-zinc-100 px-4 py-2 sm:px-6 md:hidden lg:px-8 dark:border-zinc-800">
         @if ($user->isStaff())
+            <flux:button :href="route('staff.dashboard')" variant="ghost" size="sm" wire:navigate>แดชบอร์ด</flux:button>
             <flux:button :href="route('staff.records.index')" variant="ghost" size="sm" wire:navigate>บันทึกของฉัน</flux:button>
         @endif
         @if ($user->isHrOrAdmin())

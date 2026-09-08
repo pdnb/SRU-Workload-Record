@@ -27,12 +27,13 @@ Route::middleware(['auth', 'verified'])->group(function () {
         $user = Auth::user();
 
         return match (true) {
-            $user->isStaff() => redirect()->route('staff.records.index'),
+            $user->isStaff() => redirect()->route('staff.dashboard'),
             default => redirect()->route('hr.dashboard'),
         };
     })->name('home');
 
     Route::middleware('role:staff')->prefix('staff')->name('staff.')->group(function () {
+        Route::livewire('dashboard', 'pages::staff.dashboard')->name('dashboard');
         Route::livewire('records', 'pages::staff.record-list')->name('records.index');
         Route::livewire('records/create', 'pages::staff.work-record-form')->name('records.create');
         Route::livewire('records/{record}', 'pages::staff.work-record-form')->name('records.show');

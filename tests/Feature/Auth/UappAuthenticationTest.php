@@ -47,7 +47,7 @@ class UappAuthenticationTest extends TestCase
 
         $response = $this->get(route('auth.uapp.callback'));
 
-        $response->assertRedirect(route('staff.records.index', absolute: false));
+        $response->assertRedirect(route('staff.dashboard', absolute: false));
         $this->assertAuthenticated();
 
         $this->assertDatabaseHas('users', [

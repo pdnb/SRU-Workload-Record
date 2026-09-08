@@ -46,6 +46,17 @@
                 @if ($active['hours_sum'] > 0)
                     <flux:badge size="sm" color="zinc">{{ number_format($active['hours_sum'], 1) }} งาน</flux:badge>
                 @endif
+                @unless ($readOnly)
+                    <flux:button
+                        wire:click="openEntryModal({{ $workloadId }})"
+                        variant="primary"
+                        size="sm"
+                        icon="plus"
+                        class="shrink-0"
+                    >
+                        บันทึกงาน
+                    </flux:button>
+                @endunless
             </div>
 
             @if ($canShare && count($workloadEntries))
@@ -122,6 +133,7 @@
                             $entryEarned = filled($unitScore) && filled($entry['hours'] ?? null)
                                 ? (float) $unitScore * (float) $entry['hours']
                                 : null;
+                            $isMirror = ! empty($entry['is_mirror']);
                         @endphp
                         <li
                             wire:key="entry-{{ $workloadId }}-{{ $index }}"
@@ -152,8 +164,22 @@
                                 @if (filled($entry['result'] ?? null))
                                     <span class="mt-1 block line-clamp-1 text-zinc-500">{{ Str::limit($entry['result'], 60) }}</span>
                                 @endif
+
+                                @if (! $isMirror && filled($entry['collaborator_names'] ?? []))
+                                    <div class="mt-1 block">
+                                        <flux:badge size="sm">ผู้ร่วมงาน: {{ implode(', ', $entry['collaborator_names']) }}</flux:badge>
+                                    </div>
+                                @endif
+
+                                @if ($isMirror)
+                                    <div class="mt-1 block">
+                                        <flux:badge size="sm" color="zinc">
+                                            ผลงานร่วมจาก {{ $entry['shared_from_name'] ?? 'เพื่อนร่วมงาน' }}
+                                        </flux:badge>
+                                    </div>
+                                @endif
                             </button>
-                            @unless ($readOnly)
+                            @unless ($readOnly || $isMirror)
                                 <div class="flex shrink-0 gap-1">
                                     <flux:button wire:click="openEntryModal({{ $workloadId }}, {{ $index }})" variant="ghost" size="xs" icon="pencil-square" />
                                 </div>
@@ -162,10 +188,10 @@
                     @endforeach
                 </ul>
             @else
-                <x-empty-state icon="document-text" message="ยังไม่มีผลงานในภาระงานนี้" class="py-8">
+                <x-empty-state icon="document-text" message="ยังไม่บันทึกงานในภาระงานนี้" class="py-8">
                     @unless ($readOnly)
                         <flux:button wire:click="openEntryModal({{ $workloadId }})" variant="primary" size="sm" icon="plus">
-                            เพิ่มผลงานแรก
+                            บันทึกงานแรก
                         </flux:button>
                     @endunless
                 </x-empty-state>
@@ -174,7 +200,7 @@
             @if (count($workloadEntries) && ! $readOnly)
                 <div class="mt-4">
                     <flux:button wire:click="openEntryModal({{ $workloadId }})" variant="primary" size="sm" icon="plus">
-                        เพิ่มผลงาน
+                        บันทึกงาน
                     </flux:button>
                 </div>
             @endif

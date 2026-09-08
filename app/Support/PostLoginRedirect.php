@@ -9,7 +9,7 @@ class PostLoginRedirect
     public static function routeFor(User $user): string
     {
         $route = match (true) {
-            $user->isStaff() => 'staff.records.index',
+            $user->isStaff() => 'staff.dashboard',
             default => 'hr.dashboard',
         };
 

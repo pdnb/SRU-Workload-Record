@@ -48,6 +48,66 @@
         <flux:error name="modalEntry.hours" />
     </flux:field>
 
+    @unless ($modalEntry['is_mirror'] ?? false)
+        <div>
+            <flux:label class="mb-2">ผู้ร่วมงาน</flux:label>
+            <p class="mb-3 text-sm text-zinc-500">เลือกบุคลากรที่ร่วมทำงาน — ผลงานจะถูกบันทึกในบันทึกของผู้ร่วมงานด้วย</p>
+
+            @unless ($readonly)
+                <flux:input
+                    wire:model.live.debounce.300ms="collaboratorSearch"
+                    type="search"
+                    placeholder="ค้นหาชื่อหรืออีเมล (อย่างน้อย 2 ตัวอักษร)"
+                    class="mb-3"
+                />
+
+                @if ($this->collaboratorSearchResults->isNotEmpty())
+                    <ul class="mb-3 max-h-40 overflow-y-auto rounded-lg border border-zinc-200 dark:border-zinc-700">
+                        @foreach ($this->collaboratorSearchResults as $user)
+                            <li wire:key="collab-search-{{ $user->id }}">
+                                <button
+                                    type="button"
+                                    wire:click="addCollaborator({{ $user->id }})"
+                                    class="flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-sm hover:bg-zinc-50 dark:hover:bg-zinc-800"
+                                >
+                                    <span>{{ $user->name }}</span>
+                                    @if (filled($user->department))
+                                        <span class="text-xs text-zinc-500">{{ $user->department }}</span>
+                                    @endif
+                                </button>
+                            </li>
+                        @endforeach
+                    </ul>
+                @endif
+            @endunless
+
+            @if ($this->modalCollaborators->isNotEmpty())
+                <div class="flex flex-wrap gap-2">
+                    @foreach ($this->modalCollaborators as $user)
+                        <flux:badge size="sm" color="zinc" class="inline-flex items-center gap-1">
+                            {{ $user->name }}
+                            @unless ($readonly)
+                                <button
+                                    type="button"
+                                    wire:click="removeCollaborator({{ $user->id }})"
+                                    class="ml-1 text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200"
+                                    aria-label="ลบ {{ $user->name }}"
+                                >
+                                    &times;
+                                </button>
+                            @endunless
+                        </flux:badge>
+                    @endforeach
+                </div>
+            @elseif ($readonly)
+                <span class="text-sm text-zinc-500">ไม่มีผู้ร่วมงาน</span>
+            @endif
+
+            <flux:error name="modalEntry.collaborator_ids" />
+            <flux:error name="modalEntry.collaborator_ids.*" />
+        </div>
+    @endunless
+
     <div>
         <flux:label class="mb-2">หลักฐานประกอบ</flux:label>
         <p class="mb-3 text-sm text-zinc-500">อัปโหลดไฟล์ได้หลายไฟล์ หรือ วาง URL</p>

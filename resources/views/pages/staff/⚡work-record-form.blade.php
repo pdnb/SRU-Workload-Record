@@ -1822,9 +1822,7 @@ new class extends Component
                     <dd class="mt-1 text-2xl font-semibold tracking-tight tabular-nums">
                         @if ($score->hasMaximum() || $score->hasEarned())
                             {{ number_format($score->earned, 2) }}
-                            @if ($score->hasMaximum())
-                                <span class="text-sm font-normal text-zinc-500">/ {{ number_format($score->maximum, 2) }}</span>
-                            @endif
+                            <span class="text-sm font-normal text-zinc-500">คะแนน</span>
                         @else
                             <span class="text-zinc-400">—</span>
                         @endif
@@ -1863,18 +1861,11 @@ new class extends Component
                             <flux:button wire:click="goToStep(2)" size="sm">ไปบันทึกงาน</flux:button>
                         </x-slot>
                     </flux:callout>
-                @elseif ($emptyWorkloads > 0)
-                    <flux:callout variant="warning" icon="exclamation-circle" heading="ยังไม่ได้บันทึกงาน {{ $emptyWorkloads }} จาก {{ $progress['total'] }} ภาระงาน">
-                        <flux:callout.text>ส่งได้เลยถ้าภาระงานที่เหลือไม่เกี่ยวข้องกับคุณ</flux:callout.text>
-                        <x-slot name="actions">
-                            <flux:button wire:click="reviewEmptyWorkloads" size="sm">ดูภาระงานที่ยังไม่บันทึก</flux:button>
-                        </x-slot>
-                    </flux:callout>
                 @endif
 
                 @if ($this->totalEntriesCount > 0)
                     <flux:callout variant="secondary" icon="link">
-                        <flux:callout.text>เมื่อส่งแล้ว ระบบจะสร้างลิงก์สรุปผลงานของทุกภาระงานให้คัดลอกไปกรอกในระบบภายนอก</flux:callout.text>
+                        <flux:callout.text>เมื่อส่งแล้ว ระบบจะสร้างลิงก์สรุปผลงานของทุกภาระงานเพื่อคัดลอกไปยังระบบอื่น</flux:callout.text>
                     </flux:callout>
                 @endif
             @endunless
@@ -1998,8 +1989,13 @@ new class extends Component
                                 class="group flex items-center gap-3 px-6 py-3 transition-colors hover:bg-zinc-50 dark:hover:bg-zinc-900/40"
                                 x-data="{ url: @js($link['url']) }"
                             >
+                                @if (filled($link['number']))
+                                    <span class="inline-flex h-6 min-w-10 shrink-0 items-center justify-center self-start rounded-md bg-blue-50 px-1.5 font-mono text-xs font-semibold text-blue-700 tabular-nums ring-1 ring-blue-200 ring-inset dark:bg-blue-950 dark:text-blue-300 dark:ring-blue-800">
+                                        {{ $link['number'] }}
+                                    </span>
+                                @endif
                                 <div class="min-w-0 flex-1">
-                                    <p class="truncate text-sm font-medium">{{ trim($link['number'].' '.$link['name']) }}</p>
+                                    <p class="truncate text-sm font-medium">{{ $link['name'] }}</p>
                                     <p class="truncate text-xs text-zinc-500">
                                         {{ $link['group'] }}
                                         @if ($link['main'])

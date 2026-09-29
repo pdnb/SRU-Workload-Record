@@ -663,6 +663,9 @@ new class extends Component
         </div>
         <div class="flex flex-wrap gap-2">
             @if ($selectedPositionId)
+                <flux:button wire:click="backToList" variant="ghost" icon="arrow-left">
+                    กลับไปรายการตำแหน่ง
+                </flux:button>
                 @if ($this->selectedFiscalYear)
                     @unless ($this->isLocked)
                         <flux:button wire:click="openImportModal" variant="ghost" icon="arrow-up-tray">
@@ -670,9 +673,6 @@ new class extends Component
                         </flux:button>
                     @endunless
                 @endif
-                <flux:button wire:click="backToList" variant="ghost" icon="arrow-left">
-                    กลับไปรายการตำแหน่ง
-                </flux:button>
                 @if ($this->selectedFiscalYear)
                     @if ($this->selectedStructure)
                         <flux:button wire:click="openCopyPositionModal" variant="ghost" icon="document-duplicate">

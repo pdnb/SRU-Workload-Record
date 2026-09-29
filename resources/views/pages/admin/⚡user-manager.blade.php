@@ -102,16 +102,16 @@ new class extends Component
             try {
                 $found = app(SyncStaffPositions::class)->forUser($user);
             } catch (\Throwable $e) {
-                Flux::toast('ดึงตำแหน่งจาก Oracle ไม่สำเร็จ: '.$e->getMessage(), variant: 'danger');
+                Flux::toast('ดึงตำแหน่งจาก PCM ไม่สำเร็จ: '.$e->getMessage(), variant: 'danger');
 
                 return;
             }
 
             $found
-                ? Flux::toast("อัปเดตตำแหน่งของ {$user->name} จาก Oracle แล้ว")
-                : Flux::toast("ไม่พบข้อมูลตำแหน่งของ {$user->name} ใน Oracle", variant: 'warning');
+                ? Flux::toast("อัปเดตตำแหน่งของ {$user->name} จาก PCM แล้ว")
+                : Flux::toast("ไม่พบข้อมูลตำแหน่งของ {$user->name} ใน PCM", variant: 'warning');
         } else {
-            Flux::toast('จะใช้ตำแหน่งจาก Oracle ในการซิงก์ครั้งถัดไป');
+            Flux::toast('จะใช้ตำแหน่งจาก PCM ในการซิงก์ครั้งถัดไป');
         }
 
         unset($this->users, $this->positions, $this->staffWithoutPositionCount);
@@ -271,7 +271,7 @@ new class extends Component
                                 @if ($user->position_source === PositionSource::Manual)
                                     <flux:badge size="sm" color="amber">{{ PositionSource::Manual->label() }}</flux:badge>
                                     <flux:button size="xs" variant="ghost" icon="arrow-path" wire:click="useOraclePosition({{ $user->id }})">
-                                        ใช้ค่าจาก Oracle
+                                        ใช้ค่าจาก PCM
                                     </flux:button>
                                 @else
                                     <flux:badge size="sm" color="sky">{{ PositionSource::Oracle->label() }}</flux:badge>
@@ -298,7 +298,7 @@ new class extends Component
     <div class="mb-4 flex items-center justify-between gap-4">
         <div>
             <flux:heading size="lg">ตำแหน่ง</flux:heading>
-            <flux:subheading>ตำแหน่งจาก Oracle แก้ไขได้ที่ระบบต้นทางเท่านั้น</flux:subheading>
+            <flux:subheading>ตำแหน่งจาก PCM แก้ไขได้ที่ระบบต้นทางเท่านั้น</flux:subheading>
         </div>
         <flux:button wire:click="openCreatePosition" variant="primary" icon="plus" size="sm">เพิ่มตำแหน่ง</flux:button>
     </div>
@@ -311,7 +311,7 @@ new class extends Component
                         <span class="shrink-0 tabular-nums text-sm text-zinc-500">{{ $position->code }}</span>
                         <span class="text-sm font-medium">{{ $position->name }}</span>
                         @if ($position->isFromOracle())
-                            <flux:badge size="sm" color="sky">Oracle</flux:badge>
+                            <flux:badge size="sm" color="sky">PCM</flux:badge>
                         @endif
                         @unless ($position->is_active)
                             <flux:badge size="sm" color="zinc">ไม่ใช้งาน</flux:badge>

@@ -10,7 +10,7 @@ enum PositionSource: string
     public function label(): string
     {
         return match ($this) {
-            self::Oracle => 'Oracle',
+            self::Oracle => 'PCM',
             self::Manual => 'กำหนดเอง',
         };
     }

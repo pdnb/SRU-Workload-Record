@@ -528,7 +528,7 @@ new class extends Component
         } catch (\RuntimeException $e) {
             match ($e->getMessage()) {
                 'target_has_structure' => Flux::toast('ตำแหน่งปลายทางมีโครงสร้างอยู่แล้ว — เปิดตัวเลือกแทนที่โครงสร้างเดิม', variant: 'warning'),
-                'target_is_oracle' => Flux::toast('ตำแหน่งปลายทางใช้โครงสร้างจาก Oracle — ไม่สามารถแทนที่ได้', variant: 'warning'),
+                'target_is_oracle' => Flux::toast('ตำแหน่งปลายทางใช้โครงสร้างจาก PCM — ไม่สามารถแทนที่ได้', variant: 'warning'),
                 default => throw $e,
             };
         }
@@ -539,7 +539,7 @@ new class extends Component
         Gate::authorize('manage', WorkloadGroup::make());
 
         if (! config('oracle_workload.enabled')) {
-            Flux::toast('ยังไม่ได้เปิดใช้งานการซิงก์ Oracle (ORACLE_SYNC_ENABLED)', variant: 'warning');
+            Flux::toast('ยังไม่ได้เปิดใช้งานการซิงก์ PCM (ORACLE_SYNC_ENABLED)', variant: 'warning');
 
             return;
         }
@@ -549,8 +549,8 @@ new class extends Component
         unset($this->workloadGroups, $this->selectedStructure, $this->positions, $this->latestSyncRun, $this->positionSummaries);
 
         $run->status === 'success'
-            ? Flux::toast('ซิงก์ข้อมูลจาก Oracle เรียบร้อยแล้ว')
-            : Flux::toast('ซิงก์จาก Oracle ไม่สำเร็จ: '.$run->error, variant: 'danger');
+            ? Flux::toast('ซิงก์ข้อมูลจาก PCM เรียบร้อยแล้ว')
+            : Flux::toast('ซิงก์จาก PCM ไม่สำเร็จ: '.$run->error, variant: 'danger');
     }
 
     public function openImportModal(): void
@@ -612,7 +612,7 @@ new class extends Component
         } catch (\RuntimeException $e) {
             match ($e->getMessage()) {
                 'fiscal_year_has_structure' => Flux::toast('ตำแหน่งนี้มีโครงสร้างในปีงบประมาณนี้อยู่แล้ว — เปิดตัวเลือกแทนที่โครงสร้างเดิม', variant: 'warning'),
-                'structure_is_oracle' => Flux::toast('โครงสร้างนี้ซิงก์จาก Oracle — ไม่สามารถนำเข้าทับได้', variant: 'warning'),
+                'structure_is_oracle' => Flux::toast('โครงสร้างนี้ซิงก์จาก PCM — ไม่สามารถนำเข้าทับได้', variant: 'warning'),
                 default => throw $e,
             };
         }
@@ -686,7 +686,7 @@ new class extends Component
             @else
                 @if (config('oracle_workload.enabled'))
                     <flux:button wire:click="syncFromOracle" variant="ghost" icon="arrow-path" wire:loading.attr="disabled" wire:target="syncFromOracle">
-                        ซิงก์จาก Oracle
+                        ซิงก์จาก PCM
                     </flux:button>
                 @endif
                 @if ($this->selectedFiscalYear)
@@ -701,7 +701,7 @@ new class extends Component
     @if ($selectedPositionId)
         @if ($this->selectedStructure?->isFromOracle())
             <div class="mb-6 flex items-center gap-2">
-                <flux:badge color="amber" icon="lock-closed">Oracle</flux:badge>
+                <flux:badge color="amber" icon="lock-closed">PCM</flux:badge>
                 <span class="text-xs text-zinc-500 dark:text-zinc-400">
                     ซิงก์ล่าสุด {{ $this->selectedStructure->synced_at?->format('d/m/Y H:i') ?? '-' }} — แก้ไขได้ที่ระบบต้นทางเท่านั้น
                 </span>
@@ -729,7 +729,7 @@ new class extends Component
 
     @if (! $selectedPositionId && config('oracle_workload.enabled') && $this->latestSyncRun)
         <div class="-mt-4 mb-6 text-xs text-zinc-500 dark:text-zinc-400">
-            ซิงก์ Oracle ครั้งล่าสุด {{ $this->latestSyncRun->started_at->format('d/m/Y H:i') }}
+            ซิงก์ PCM ครั้งล่าสุด {{ $this->latestSyncRun->started_at->format('d/m/Y H:i') }}
             —
             @if ($this->latestSyncRun->status === 'success')
                 <span class="text-green-600 dark:text-green-400">สำเร็จ</span>
@@ -741,7 +741,7 @@ new class extends Component
 
     @unless ($selectedPositionId)
         @if ($this->positionSummaries->isEmpty() && trim($positionSearch) === '')
-            <x-empty-state icon="folder-open" message="ยังไม่มีตำแหน่ง — ซิงก์จาก Oracle หรือเพิ่มตำแหน่งที่หน้าจัดการผู้ใช้ก่อน" />
+            <x-empty-state icon="folder-open" message="ยังไม่มีตำแหน่ง — ซิงก์จาก PCM หรือเพิ่มตำแหน่งที่หน้าจัดการผู้ใช้ก่อน" />
         @elseif ($this->positionSummaries->isEmpty())
             <x-empty-state icon="magnifying-glass" message="ไม่พบตำแหน่งที่ค้นหา" />
         @else
@@ -773,7 +773,7 @@ new class extends Component
                                         @if (! $row['structure'] || $row['groups'] === 0)
                                             <flux:badge size="sm" color="zinc">ยังไม่มีโครงสร้าง</flux:badge>
                                         @elseif ($row['structure']->isFromOracle())
-                                            <flux:badge size="sm" color="amber" icon="lock-closed">Oracle</flux:badge>
+                                            <flux:badge size="sm" color="amber" icon="lock-closed">PCM</flux:badge>
                                         @else
                                             <flux:badge size="sm" color="green">มีโครงสร้าง</flux:badge>
                                         @endif

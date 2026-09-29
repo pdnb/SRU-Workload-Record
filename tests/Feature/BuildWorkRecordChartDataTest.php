@@ -89,6 +89,8 @@ class BuildWorkRecordChartDataTest extends TestCase
         $this->assertSame([100.0], $data['scoreByGroup']['max']);
         $this->assertSame(['1 '.$group->name], $data['hoursByGroup']['labels']);
         $this->assertSame([3.0], $data['hoursByGroup']['values']);
+        $this->assertSame(['1 '.$group->name], $data['hoursRadar']['labels']);
+        $this->assertSame([3.0], $data['hoursRadar']['values']);
         $this->assertSame(1, $data['progress']['filled']);
         $this->assertSame(0, $data['progress']['empty']);
         $this->assertSame(100, $data['progress']['percent']);
@@ -96,12 +98,21 @@ class BuildWorkRecordChartDataTest extends TestCase
 
     public function test_chart_data_empty_when_no_entries(): void
     {
-        ['record' => $record] = $this->createChartContext();
+        ['record' => $record, 'group' => $group] = $this->createChartContext();
 
         $data = app(BuildWorkRecordChartData::class)($record);
 
         $this->assertFalse($data['hasEntries']);
         $this->assertSame([], $data['hoursByGroup']['values']);
+        $this->assertSame(['1 '.$group->name], $data['hoursRadar']['labels']);
+        $this->assertSame([0.0], $data['hoursRadar']['values']);
         $this->assertSame(0, $data['progress']['filled']);
+    }
+
+    public function test_empty_chart_data_includes_hours_radar(): void
+    {
+        $data = app(BuildWorkRecordChartData::class)->empty();
+
+        $this->assertSame(['labels' => [], 'values' => []], $data['hoursRadar']);
     }
 }

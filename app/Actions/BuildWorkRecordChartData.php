@@ -63,6 +63,7 @@ class BuildWorkRecordChartData
 
         $scoreByGroup = [];
         $hoursByGroup = [];
+        $hoursRadar = [];
 
         foreach ($flatWorkloads->groupBy('group_id') as $items) {
             $first = $items->first();
@@ -87,6 +88,11 @@ class BuildWorkRecordChartData
 
             $hours = (float) $items->sum('hours_sum');
 
+            $hoursRadar[] = [
+                'label' => $label,
+                'hours' => $hours,
+            ];
+
             if ($hours > 0) {
                 $hoursByGroup[] = [
                     'label' => $label,
@@ -110,6 +116,10 @@ class BuildWorkRecordChartData
                 'labels' => array_column($hoursByGroup, 'label'),
                 'values' => array_column($hoursByGroup, 'hours'),
             ],
+            'hoursRadar' => [
+                'labels' => array_column($hoursRadar, 'label'),
+                'values' => array_column($hoursRadar, 'hours'),
+            ],
             'progress' => [
                 'filled' => $filled,
                 'empty' => max(0, $total - $filled),
@@ -124,6 +134,7 @@ class BuildWorkRecordChartData
             'hasEntries' => false,
             'scoreByGroup' => ['labels' => [], 'earned' => [], 'max' => []],
             'hoursByGroup' => ['labels' => [], 'values' => []],
+            'hoursRadar' => ['labels' => [], 'values' => []],
             'progress' => ['filled' => 0, 'empty' => 0, 'percent' => 0],
         ];
     }

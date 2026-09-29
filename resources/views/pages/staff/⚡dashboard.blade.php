@@ -195,10 +195,23 @@ new class extends Component
             </div>
         </div>
 
-        <div class="mb-4 grid gap-4 sm:grid-cols-2">
+        <script type="application/json" id="staffDashChartPayload">@json($chartData)</script>
+        <div class="mb-4 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+            <div class="rounded-xl border border-zinc-200 bg-white p-6 md:col-span-2 xl:col-span-1 dark:border-zinc-700 dark:bg-zinc-800">
+                <flux:heading size="lg" class="mb-4">จำนวนงานตามกลุ่มภาระงาน</flux:heading>
+                <div wire:ignore class="relative h-64">
+                    <canvas id="staffDashRadarChart"></canvas>
+                    @unless ($chartData['hasEntries'])
+                        <div class="absolute inset-0 flex items-center justify-center text-sm text-zinc-400">
+                            ยังไม่บันทึกงาน
+                        </div>
+                    @endunless
+                </div>
+            </div>
+
             <div class="rounded-xl border border-zinc-200 bg-white p-6 dark:border-zinc-700 dark:bg-zinc-800">
                 <flux:heading size="lg" class="mb-4">สัดส่วนงาน</flux:heading>
-                <div wire:ignore class="relative h-56">
+                <div wire:ignore class="relative h-64">
                     <canvas id="staffDashHoursChart"></canvas>
                     @unless ($chartData['hasEntries'])
                         <div class="absolute inset-0 flex items-center justify-center text-sm text-zinc-400">
@@ -210,7 +223,7 @@ new class extends Component
 
             <div class="rounded-xl border border-zinc-200 bg-white p-6 dark:border-zinc-700 dark:bg-zinc-800">
                 <flux:heading size="lg" class="mb-4">ความคืบหน้าภาระงาน</flux:heading>
-                <div wire:ignore class="relative h-56">
+                <div wire:ignore class="relative h-64">
                     <canvas id="staffDashProgressChart"></canvas>
                     @unless ($chartData['hasEntries'])
                         <div class="absolute inset-0 flex items-center justify-center text-sm text-zinc-400">
@@ -221,22 +234,10 @@ new class extends Component
             </div>
         </div>
 
-        <div class="grid gap-4 sm:grid-cols-2">
-            <script type="application/json" id="staffDashChartPayload">@json($chartData)</script>
-            <div class="rounded-xl border border-zinc-200 bg-white p-6 dark:border-zinc-700 dark:bg-zinc-800">
-                <flux:heading size="lg" class="mb-4">คะแนนตามกลุ่มภาระงาน</flux:heading>
-                <div wire:ignore class="relative h-72">
-                    <canvas id="staffDashScoreChart"></canvas>
-                    @unless ($chartData['hasEntries'])
-                        <div class="absolute inset-0 flex items-center justify-center text-sm text-zinc-400">
-                            ยังไม่บันทึกงาน
-                        </div>
-                    @endunless
-                </div>
-            </div>
+        <div>
             <div class="mb-4 rounded-xl border border-zinc-200 bg-white p-6 dark:border-zinc-700 dark:bg-zinc-800">
                 <flux:heading size="lg" class="mb-4">รายการล่าสุด</flux:heading>
-    
+
                 @if ($this->latestEntries->isNotEmpty())
                     <ul class="space-y-2">
                         @foreach ($this->latestEntries as $entry)
@@ -281,19 +282,19 @@ new class extends Component
 
     @script
     <script>
-        let staffDashScoreChart = null;
+        let staffDashRadarChart = null;
         let staffDashHoursChart = null;
         let staffDashProgressChart = null;
 
         const staffDashHoursColors = ['#60a5fa', '#34d399', '#fbbf24', '#fb7185', '#a78bfa', '#22d3ee'];
 
         function destroyStaffDashCharts() {
-            [staffDashScoreChart, staffDashHoursChart, staffDashProgressChart].forEach((chart) => {
+            [staffDashRadarChart, staffDashHoursChart, staffDashProgressChart].forEach((chart) => {
                 if (chart) {
                     chart.destroy();
                 }
             });
-            staffDashScoreChart = null;
+            staffDashRadarChart = null;
             staffDashHoursChart = null;
             staffDashProgressChart = null;
         }
@@ -314,11 +315,11 @@ new class extends Component
                 return;
             }
 
-            const scoreCanvas = document.getElementById('staffDashScoreChart');
+            const radarCanvas = document.getElementById('staffDashRadarChart');
             const hoursCanvas = document.getElementById('staffDashHoursChart');
             const progressCanvas = document.getElementById('staffDashProgressChart');
 
-            if (!scoreCanvas || !hoursCanvas || !progressCanvas) {
+            if (!radarCanvas || !hoursCanvas || !progressCanvas) {
                 destroyStaffDashCharts();
 
                 return;
@@ -326,48 +327,37 @@ new class extends Component
 
             destroyStaffDashCharts();
 
-            const score = data.scoreByGroup ?? { labels: [], earned: [], max: [] };
-            const hasMax = (score.max ?? []).some((value) => value !== null);
-            const scoreDatasets = [];
+            const radar = data.hoursRadar ?? { labels: [], values: [] };
 
-            if (hasMax) {
-                scoreDatasets.push({
-                    label: 'คะแนนสูงสุด',
-                    data: score.max.map((value) => value ?? 0),
-                    backgroundColor: '#e4e4e7',
-                    borderRadius: 6,
-                    order: 2,
-                });
-            }
-
-            scoreDatasets.push({
-                label: 'คะแนนที่ได้',
-                data: score.earned,
-                backgroundColor: '#a855f7',
-                borderRadius: 6,
-                order: 1,
-            });
-
-            staffDashScoreChart = new Chart(scoreCanvas, {
-                type: 'bar',
+            staffDashRadarChart = new Chart(radarCanvas, {
+                type: 'radar',
                 data: {
-                    labels: score.labels,
-                    datasets: scoreDatasets,
+                    labels: radar.labels,
+                    datasets: [{
+                        label: 'จำนวนงาน',
+                        data: radar.values,
+                        backgroundColor: 'rgba(168, 85, 247, 0.2)',
+                        borderColor: '#a855f7',
+                        pointBackgroundColor: '#a855f7',
+                        borderWidth: 2,
+                    }],
                 },
                 options: {
-                    indexAxis: 'y',
                     responsive: true,
                     maintainAspectRatio: false,
                     plugins: {
-                        legend: { display: hasMax },
+                        legend: { display: false },
                         tooltip: {
                             callbacks: {
-                                label: (ctx) => `${ctx.dataset.label}: ${ctx.parsed.x.toFixed(2)} คะแนน`,
+                                label: (ctx) => `${ctx.label}: ${ctx.parsed.r.toFixed(1)} งาน`,
                             },
                         },
                     },
                     scales: {
-                        x: { beginAtZero: true },
+                        r: {
+                            beginAtZero: true,
+                            ticks: { precision: 0 },
+                        },
                     },
                 },
             });

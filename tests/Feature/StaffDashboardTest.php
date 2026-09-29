@@ -152,7 +152,7 @@ class StaffDashboardTest extends TestCase
             ->test('pages::staff.dashboard')
             ->set('filterPeriodId', $period->id)
             ->assertSee('ยังไม่มีบันทึกในรอบนี้')
-            ->assertDontSeeHtml('id="staffDashScoreChart"');
+            ->assertDontSeeHtml('id="staffDashRadarChart"');
     }
 
     public function test_renders_chart_section_with_canvas_elements(): void
@@ -170,10 +170,10 @@ class StaffDashboardTest extends TestCase
         $component = Livewire::actingAs($user)
             ->test('pages::staff.dashboard')
             ->set('filterPeriodId', $period->id)
-            ->assertSee('คะแนนตามกลุ่มภาระงาน')
+            ->assertSee('จำนวนงานตามกลุ่มภาระงาน')
             ->assertSee('สัดส่วนงาน')
             ->assertSee('ความคืบหน้าภาระงาน')
-            ->assertSeeHtml('id="staffDashScoreChart"')
+            ->assertSeeHtml('id="staffDashRadarChart"')
             ->assertSeeHtml('id="staffDashHoursChart"')
             ->assertSeeHtml('id="staffDashProgressChart"');
 
@@ -184,6 +184,8 @@ class StaffDashboardTest extends TestCase
         $this->assertSame([30.0], $data['scoreByGroup']['earned']);
         $this->assertSame(['1 '.$group->name], $data['hoursByGroup']['labels']);
         $this->assertSame([3.0], $data['hoursByGroup']['values']);
+        $this->assertSame(['1 '.$group->name], $data['hoursRadar']['labels']);
+        $this->assertSame([3.0], $data['hoursRadar']['values']);
         $this->assertSame(1, $data['progress']['filled']);
     }
 
@@ -196,7 +198,7 @@ class StaffDashboardTest extends TestCase
             ->set('filterPeriodId', $period->id)
             ->assertSee('0 รายการ')
             ->assertSee('ยังไม่บันทึกงาน')
-            ->assertSeeHtml('id="staffDashScoreChart"');
+            ->assertSeeHtml('id="staffDashRadarChart"');
     }
 
     public function test_shows_latest_entries_in_updated_at_order(): void

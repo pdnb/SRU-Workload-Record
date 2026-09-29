@@ -81,35 +81,13 @@
 
                     <div class="mt-3 flex flex-wrap gap-2">
                         @if ($shareEnabled && $shareUrl)
-                            <div
-                                class="contents"
-                                x-data="{
-                                    shareUrl: @js($shareUrl),
-                                    copyShareUrl() {
-                                        if (navigator.clipboard && window.isSecureContext) {
-                                            navigator.clipboard.writeText(this.shareUrl).then(() => $wire.notifyShareLinkCopied());
-                                            return;
-                                        }
-
-                                        const input = document.createElement('textarea');
-                                        input.value = this.shareUrl;
-                                        input.style.position = 'fixed';
-                                        input.style.opacity = '0';
-                                        document.body.appendChild(input);
-                                        input.focus();
-                                        input.select();
-                                        document.execCommand('copy');
-                                        document.body.removeChild(input);
-                                        $wire.notifyShareLinkCopied();
-                                    },
-                                }"
-                            >
+                            <div class="contents" x-data="{ shareUrl: @js($shareUrl) }">
                                 <flux:button
                                     type="button"
                                     variant="filled"
                                     size="sm"
                                     icon="link"
-                                    x-on:click="copyShareUrl()"
+                                    x-on:click="window.copyText(shareUrl).then(() => $wire.notifyShareLinkCopied())"
                                 >
                                     คัดลอกลิงก์
                                 </flux:button>

@@ -1,5 +1,6 @@
 <?php
 
+use App\Actions\EnableAllWorkloadShares;
 use App\Actions\SyncCollaboratorWorkEntries;
 use App\Data\WorkRecordScoreSummary;
 use App\Enums\UserRole;
@@ -35,10 +36,6 @@ new class extends Component
 
     /** @var array<int, array<int, array<string, mixed>>> */
     public array $entries = [];
-
-    public string $selfAssessment = '';
-
-    public ?int $selfScore = null;
 
     public bool $readOnly = false;
 
@@ -92,8 +89,6 @@ new class extends Component
             ]);
 
             $this->selectedPeriodId = $record->evaluation_period_id;
-            $this->selfAssessment = $record->self_assessment ?? '';
-            $this->selfScore = $record->self_score;
             $this->readOnly = ! $record->isEditable() || ! Gate::allows('update', $record);
             $this->loadEntriesFromRecord();
 
@@ -485,6 +480,31 @@ new class extends Component
     }
 
     #[Computed]
+    public function groupSummaries(): array
+    {
+        $totals = $this->categoryTotals['groups'];
+
+        return $this->flatWorkloads
+            ->groupBy('group_id')
+            ->map(function ($items, $groupId) use ($totals) {
+                $first = $items->first();
+
+                return [
+                    'id' => $groupId,
+                    'label' => trim(($first['group_number'] ?? '').' '.($first['group_name'] ?? '')),
+                    'workloads_total' => $items->count(),
+                    'workloads_filled' => $items->where('entry_count', '>', 0)->count(),
+                    'entry_count' => $totals[$groupId]['entry_count'] ?? 0,
+                    'hours' => (float) $items->sum('hours_sum'),
+                    'score' => $totals[$groupId]['score'] ?? 0.0,
+                    'max_score' => $totals[$groupId]['max_score'] ?? null,
+                ];
+            })
+            ->values()
+            ->all();
+    }
+
+    #[Computed]
     public function workloadProgress(): array
     {
         $total = $this->flatWorkloads->count();
@@ -550,40 +570,19 @@ new class extends Component
     #[Computed]
     public function step3ChartData(): array
     {
-        $mainTotals = $this->flatWorkloads
-            ->groupBy('main_id')
-            ->map(function ($items) {
-                $total = (float) $items->sum('earned_score');
-                $max = $items->first()['main_max_score'] ?? null;
-
-                return $max !== null ? min($total, (float) $max) : $total;
-            });
-
-        $scoreByGroup = [];
         $hoursByGroup = [];
+        $hoursRadar = [];
 
         foreach ($this->flatWorkloads->groupBy('group_id') as $items) {
             $first = $items->first();
             $label = trim(($first['group_number'] ?? '').' '.($first['group_name'] ?? ''));
 
-            $groupTotal = (float) $items
-                ->pluck('main_id')
-                ->unique()
-                ->sum(fn (int $mainId) => $mainTotals[$mainId] ?? 0.0);
-
-            $max = $first['group_max_score'] ?? null;
-
-            if ($max !== null) {
-                $groupTotal = min($groupTotal, (float) $max);
-            }
-
-            $scoreByGroup[] = [
-                'label' => $label,
-                'earned' => $groupTotal,
-                'max' => $max !== null ? (float) $max : null,
-            ];
-
             $hours = (float) $items->sum('hours_sum');
+
+            $hoursRadar[] = [
+                'label' => $label,
+                'hours' => $hours,
+            ];
 
             if ($hours > 0) {
                 $hoursByGroup[] = [
@@ -597,14 +596,13 @@ new class extends Component
 
         return [
             'hasEntries' => $this->totalEntriesCount > 0,
-            'scoreByGroup' => [
-                'labels' => array_column($scoreByGroup, 'label'),
-                'earned' => array_column($scoreByGroup, 'earned'),
-                'max' => array_map(fn (array $group) => $group['max'], $scoreByGroup),
-            ],
             'hoursByGroup' => [
                 'labels' => array_column($hoursByGroup, 'label'),
                 'values' => array_column($hoursByGroup, 'hours'),
+            ],
+            'hoursRadar' => [
+                'labels' => array_column($hoursRadar, 'label'),
+                'values' => array_column($hoursRadar, 'hours'),
             ],
             'progress' => [
                 'filled' => $progress['filled'],
@@ -720,6 +718,53 @@ new class extends Component
         Flux::toast('คัดลอกลิงก์แล้ว');
     }
 
+    #[Computed]
+    public function canManageShareLinks(): bool
+    {
+        return $this->workRecord !== null
+            && $this->workRecord->user_id === Auth::id()
+            && in_array($this->workRecord->status, [WorkRecordStatus::Submitted, WorkRecordStatus::Approved], true);
+    }
+
+    #[Computed]
+    public function sharedWorkloadLinks()
+    {
+        if (! $this->canManageShareLinks) {
+            return collect();
+        }
+
+        $shares = WorkloadShare::query()
+            ->where('work_record_id', $this->workRecord->id)
+            ->whereNotNull('enabled_at')
+            ->get()
+            ->keyBy('workload_id');
+
+        return $this->flatWorkloads
+            ->filter(fn (array $workload) => $shares->has($workload['id']))
+            ->map(fn (array $workload) => [
+                'workload_id' => $workload['id'],
+                'number' => $workload['number'],
+                'name' => $workload['name'],
+                'group' => trim($workload['group_number'].' '.$workload['group_name']),
+                'main' => trim($workload['main_number'].' '.$workload['main_name']),
+                'url' => $shares[$workload['id']]->shareUrl(),
+            ])
+            ->values();
+    }
+
+    public function enableAllWorkloadShares(): void
+    {
+        if (! $this->canManageShareLinks) {
+            return;
+        }
+
+        app(EnableAllWorkloadShares::class)($this->workRecord);
+
+        unset($this->sharedWorkloadLinks, $this->selectedWorkloadShare);
+
+        Flux::toast('สร้างลิงก์แชร์ทุกภาระงานแล้ว');
+    }
+
     public function setWorkloadFilter(string $filter): void
     {
         if (! in_array($filter, ['all', 'filled', 'empty'], true)) {
@@ -728,6 +773,12 @@ new class extends Component
 
         $this->workloadFilter = $filter;
         $this->ensureSelectedWorkload();
+    }
+
+    public function reviewEmptyWorkloads(): void
+    {
+        $this->workloadFilter = 'empty';
+        $this->goToStep(2);
     }
 
     public function updatedWorkloadSearch(): void
@@ -816,11 +867,6 @@ new class extends Component
 
         Gate::authorize('update', $this->workRecord);
 
-        $this->workRecord->update([
-            'self_assessment' => $this->selfAssessment,
-            'self_score' => $this->selfScore,
-        ]);
-
         $this->syncEntriesToDatabase();
 
         if ($showToast) {
@@ -855,9 +901,11 @@ new class extends Component
             'approved_at' => null,
         ]);
 
-        Flux::toast('ส่งบันทึกภาระงานเรียบร้อยแล้ว');
+        app(EnableAllWorkloadShares::class)($this->workRecord);
 
-        $this->redirect(route('staff.records.index'), navigate: true);
+        Flux::toast('ส่งบันทึกและสร้างลิงก์แชร์ทุกภาระงานแล้ว');
+
+        $this->redirect(route('staff.records.show', $this->workRecord), navigate: true);
     }
 
     public function openWithdrawConfirm(): void
@@ -1131,11 +1179,6 @@ new class extends Component
             $this->entries[$workloadId][] = $entryData;
         }
 
-        $this->workRecord?->update([
-            'self_assessment' => $this->selfAssessment,
-            'self_score' => $this->selfScore,
-        ]);
-
         $this->syncEntriesToDatabase();
         $this->bustWorkloadComputeds();
         $this->selectedWorkloadId = $workloadId;
@@ -1186,10 +1229,6 @@ new class extends Component
         $this->entries[$workloadId] = array_values($this->entries[$workloadId]);
 
         if ($this->workRecord) {
-            $this->workRecord->update([
-                'self_assessment' => $this->selfAssessment,
-                'self_score' => $this->selfScore,
-            ]);
             $this->syncEntriesToDatabase();
         }
 
@@ -1731,155 +1770,330 @@ new class extends Component
 
     {{-- Step 3 --}}
     @if ($step === 3)
-        @if ($readOnly)
-            <div class="mb-6 flex flex-wrap gap-3 text-sm">
-                <flux:badge color="blue">{{ $this->totalEntriesCount }} ผลงาน</flux:badge>
-                <flux:badge color="zinc">{{ number_format($this->totalHoursSum, 1) }} งาน</flux:badge>
-                @php $liveScore = $this->liveScoreSummary; @endphp
-                @if ($liveScore->hasMaximum())
-                    <flux:badge color="purple">
-                        {{ number_format($liveScore->earned, 2) }} คะแนน
-                    </flux:badge>
-                @elseif ($liveScore->hasEarned())
-                    <flux:badge color="purple">{{ number_format($liveScore->earned, 2) }} คะแนน</flux:badge>
-                @endif
-            </div>
-        @endif
-
-        @php $chartData = $this->step3ChartData; @endphp
+        @php
+            $chartData = $this->step3ChartData;
+            $progress = $this->workloadProgress;
+            $score = $this->liveScoreSummary;
+            $emptyWorkloads = $progress['total'] - $progress['filled'];
+        @endphp
         <script type="application/json" id="step3ChartPayload">@json($chartData)</script>
 
-        <div class="mb-6 space-y-6">
-            <div class="rounded-xl border border-zinc-200 bg-white p-6 dark:border-zinc-700 dark:bg-zinc-800">
-                <flux:heading size="lg" class="mb-4">คะแนนตามกลุ่มภาระงาน</flux:heading>
-                <div wire:ignore class="relative h-72">
-                    <canvas id="step3ScoreChart"></canvas>
+        {{-- Overview --}}
+        <section class="mb-6 overflow-hidden rounded-2xl border border-zinc-200 bg-white dark:border-zinc-700 dark:bg-zinc-800">
+            <div class="flex flex-wrap items-center justify-between gap-3 px-6 pt-5 pb-4">
+                <div class="min-w-0">
+                    <div class="flex flex-wrap items-center gap-2">
+                        @if ($workRecord)
+                            <flux:badge :color="$workRecord->status->color()" size="sm">{{ $workRecord->status->label() }}</flux:badge>
+                        @else
+                            <flux:badge color="zinc" size="sm">ยังไม่บันทึก</flux:badge>
+                        @endif
+                        @if ($workRecord?->submitted_at)
+                            <span class="text-xs text-zinc-500">ส่งเมื่อ {{ $workRecord->submitted_at->format('d/m/Y H:i') }}</span>
+                        @endif
+                    </div>
+                    <p class="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
+                        @if ($readOnly)
+                            สรุปภาระงานที่ส่งแล้ว ดูรายการผลงานหรือพิมพ์เอกสารได้จากปุ่มด้านล่าง
+                        @else
+                            ตรวจสอบตัวเลขด้านล่างก่อนกดส่ง เมื่อส่งแล้วจะแก้ไขไม่ได้จนกว่าจะถอนการส่ง
+                        @endif
+                    </p>
+                </div>
+            </div>
+
+            <dl class="grid grid-cols-2 gap-px border-t border-zinc-200 bg-zinc-200 lg:grid-cols-4 dark:border-zinc-700 dark:bg-zinc-700">
+                <div class="bg-white px-6 py-4 dark:bg-zinc-800">
+                    <dt class="text-xs font-medium text-zinc-500">ผลงาน</dt>
+                    <dd class="mt-1 text-2xl font-semibold tracking-tight tabular-nums">
+                        {{ number_format($this->totalEntriesCount) }}
+                        <span class="text-sm font-normal text-zinc-500">รายการ</span>
+                    </dd>
+                </div>
+                <div class="bg-white px-6 py-4 dark:bg-zinc-800">
+                    <dt class="text-xs font-medium text-zinc-500">งานรวม</dt>
+                    <dd class="mt-1 text-2xl font-semibold tracking-tight tabular-nums">
+                        {{ number_format($this->totalHoursSum, 1) }}
+                        <span class="text-sm font-normal text-zinc-500">งาน</span>
+                    </dd>
+                </div>
+                <div class="bg-white px-6 py-4 dark:bg-zinc-800">
+                    <dt class="text-xs font-medium text-zinc-500">คะแนนที่ได้</dt>
+                    <dd class="mt-1 text-2xl font-semibold tracking-tight tabular-nums">
+                        @if ($score->hasMaximum() || $score->hasEarned())
+                            {{ number_format($score->earned, 2) }}
+                            @if ($score->hasMaximum())
+                                <span class="text-sm font-normal text-zinc-500">/ {{ number_format($score->maximum, 2) }}</span>
+                            @endif
+                        @else
+                            <span class="text-zinc-400">—</span>
+                        @endif
+                    </dd>
+                </div>
+                <div class="bg-white px-6 py-4 dark:bg-zinc-800">
+                    <dt class="flex items-center justify-between text-xs font-medium text-zinc-500">
+                        <span>ภาระงานที่บันทึกแล้ว</span>
+                        <span class="tabular-nums">{{ $progress['percent'] }}%</span>
+                    </dt>
+                    <dd class="mt-1 text-2xl font-semibold tracking-tight tabular-nums">
+                        {{ $progress['filled'] }}
+                        <span class="text-sm font-normal text-zinc-500">/ {{ $progress['total'] }}</span>
+                    </dd>
+                    <div class="mt-2 h-1.5 overflow-hidden rounded-full bg-zinc-100 dark:bg-zinc-700">
+                        <div class="h-full rounded-full bg-blue-500 transition-[width] duration-300" style="width: {{ $progress['percent'] }}%"></div>
+                    </div>
+                </div>
+            </dl>
+        </section>
+
+        {{-- Notices --}}
+        @if ($workRecord?->rejection_comment || ! $readOnly)
+        <div class="mb-6 space-y-3">
+            @if ($workRecord?->rejection_comment)
+                <flux:callout variant="danger" icon="exclamation-triangle" heading="ถูกส่งกลับให้แก้ไข">
+                    <flux:callout.text>{{ $workRecord->rejection_comment }}</flux:callout.text>
+                </flux:callout>
+            @endif
+
+            @unless ($readOnly)
+                @if ($this->totalEntriesCount === 0)
+                    <flux:callout variant="danger" icon="x-circle" heading="ยังไม่มีผลงาน">
+                        <flux:callout.text>ต้องบันทึกผลงานอย่างน้อย 1 รายการก่อนส่ง</flux:callout.text>
+                        <x-slot name="actions">
+                            <flux:button wire:click="goToStep(2)" size="sm">ไปบันทึกงาน</flux:button>
+                        </x-slot>
+                    </flux:callout>
+                @elseif ($emptyWorkloads > 0)
+                    <flux:callout variant="warning" icon="exclamation-circle" heading="ยังไม่ได้บันทึกงาน {{ $emptyWorkloads }} จาก {{ $progress['total'] }} ภาระงาน">
+                        <flux:callout.text>ส่งได้เลยถ้าภาระงานที่เหลือไม่เกี่ยวข้องกับคุณ</flux:callout.text>
+                        <x-slot name="actions">
+                            <flux:button wire:click="reviewEmptyWorkloads" size="sm">ดูภาระงานที่ยังไม่บันทึก</flux:button>
+                        </x-slot>
+                    </flux:callout>
+                @endif
+
+                @if ($this->totalEntriesCount > 0)
+                    <flux:callout variant="secondary" icon="link">
+                        <flux:callout.text>เมื่อส่งแล้ว ระบบจะสร้างลิงก์สรุปผลงานของทุกภาระงานให้คัดลอกไปกรอกในระบบภายนอก</flux:callout.text>
+                    </flux:callout>
+                @endif
+            @endunless
+        </div>
+        @endif
+
+        {{-- Charts --}}
+        <div class="mb-6 grid gap-4 lg:grid-cols-2">
+            <section class="flex flex-col rounded-2xl border border-zinc-200 bg-white p-6 lg:row-span-2 dark:border-zinc-700 dark:bg-zinc-800">
+                <flux:heading>จำนวนงานตามกลุ่มภาระงาน</flux:heading>
+                <flux:text class="mt-1">เทียบปริมาณงานของแต่ละกลุ่ม</flux:text>
+                <div wire:ignore class="relative mt-4 min-h-72 flex-1">
+                    <div class="absolute inset-0">
+                        <canvas id="step3RadarChart"></canvas>
+                    </div>
                     @unless ($chartData['hasEntries'])
                         <div class="absolute inset-0 flex items-center justify-center text-sm text-zinc-400">
                             ยังไม่บันทึกงาน
                         </div>
                     @endunless
                 </div>
-            </div>
+            </section>
 
-            <div class="grid gap-6 sm:grid-cols-2">
-                <div class="rounded-xl border border-zinc-200 bg-white p-6 dark:border-zinc-700 dark:bg-zinc-800">
-                    <flux:heading size="lg" class="mb-4">สัดส่วนงาน</flux:heading>
-                    <div wire:ignore class="relative h-56">
-                        <canvas id="step3HoursChart"></canvas>
-                        @unless ($chartData['hasEntries'])
-                            <div class="absolute inset-0 flex items-center justify-center text-sm text-zinc-400">
-                                ยังไม่บันทึกงาน
-                            </div>
-                        @endunless
-                    </div>
+            <section class="rounded-2xl border border-zinc-200 bg-white p-6 dark:border-zinc-700 dark:bg-zinc-800">
+                <flux:heading>สัดส่วนงาน</flux:heading>
+                <div wire:ignore class="relative mt-4 h-56">
+                    <canvas id="step3HoursChart"></canvas>
+                    @unless ($chartData['hasEntries'])
+                        <div class="absolute inset-0 flex items-center justify-center text-sm text-zinc-400">
+                            ยังไม่บันทึกงาน
+                        </div>
+                    @endunless
                 </div>
+            </section>
 
-                <div class="rounded-xl border border-zinc-200 bg-white p-6 dark:border-zinc-700 dark:bg-zinc-800">
-                    <flux:heading size="lg" class="mb-4">ความคืบหน้าภาระงาน</flux:heading>
-                    <div wire:ignore class="relative h-56">
-                        <canvas id="step3ProgressChart"></canvas>
-                        @unless ($chartData['hasEntries'])
-                            <div class="absolute inset-0 flex items-center justify-center text-sm text-zinc-400">
-                                ยังไม่บันทึกงาน
-                            </div>
-                        @endunless
-                    </div>
+            <section class="rounded-2xl border border-zinc-200 bg-white p-6 dark:border-zinc-700 dark:bg-zinc-800">
+                <flux:heading>ความคืบหน้าภาระงาน</flux:heading>
+                <div wire:ignore class="relative mt-4 h-56">
+                    <canvas id="step3ProgressChart"></canvas>
+                    @unless ($chartData['hasEntries'])
+                        <div class="absolute inset-0 flex items-center justify-center text-sm text-zinc-400">
+                            ยังไม่บันทึกงาน
+                        </div>
+                    @endunless
                 </div>
-            </div>
+            </section>
         </div>
 
-        <div class="grid gap-6 lg:grid-cols-2">
-            <div class="rounded-xl border border-zinc-200 bg-white p-6 dark:border-zinc-700 dark:bg-zinc-800">
-                <flux:heading size="lg" class="mb-4">สรุปผลงาน</flux:heading>
-                <dl class="space-y-3 text-sm">
-                    <div class="flex justify-between">
-                        <dt class="text-zinc-500">จำนวนผลงาน</dt>
-                        <dd class="font-medium">{{ $this->totalEntriesCount }} รายการ</dd>
-                    </div>
-                    <div class="flex justify-between">
-                        <dt class="text-zinc-500">งานรวม</dt>
-                        <dd class="font-medium">{{ number_format($this->totalHoursSum, 1) }} งาน</dd>
-                    </div>
-                    @php $summaryScore = $this->liveScoreSummary; @endphp
-                    @if ($summaryScore->hasMaximum() || $summaryScore->hasEarned())
-                        <div class="flex justify-between">
-                            <dt class="text-zinc-500">คะแนนที่ได้</dt>
-                            <dd class="font-medium text-purple-600 dark:text-purple-400">
-                                @if ($summaryScore->hasMaximum())
-                                    {{ number_format($summaryScore->earned, 2) }}
-                                @else
-                                    {{ number_format($summaryScore->earned, 2) }}
-                                @endif
-                                คะแนน
-                            </dd>
-                        </div>
-                    @endif
-                    @if ($workRecord)
-                        <div class="flex justify-between">
-                            <dt class="text-zinc-500">สถานะ</dt>
-                            <dd><flux:badge :color="$workRecord->status->color()" size="sm">{{ $workRecord->status->label() }}</flux:badge></dd>
-                        </div>
-                    @endif
-                </dl>
+        {{-- Per-group breakdown --}}
+        <section class="mb-6 rounded-2xl border border-zinc-200 bg-white dark:border-zinc-700 dark:bg-zinc-800">
+            <div class="px-6 pt-5 pb-3">
+                <flux:heading>สรุปตามกลุ่มภาระงาน</flux:heading>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="w-full min-w-[36rem] text-sm">
+                    <thead>
+                        <tr class="border-y border-zinc-100 text-left text-xs text-zinc-500 dark:border-zinc-700">
+                            <th class="px-6 py-2 font-medium">กลุ่ม</th>
+                            <th class="px-3 py-2 text-right font-medium">ภาระงานที่บันทึก</th>
+                            <th class="px-3 py-2 text-right font-medium">ผลงาน</th>
+                            <th class="px-3 py-2 text-right font-medium">งาน</th>
+                            <th class="w-48 px-6 py-2 text-right font-medium">คะแนน</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-zinc-100 dark:divide-zinc-700">
+                        @foreach ($this->groupSummaries as $group)
+                            <tr wire:key="group-summary-{{ $group['id'] }}" @class(['text-zinc-400' => $group['entry_count'] === 0])>
+                                <td class="px-6 py-3 font-medium">{{ $group['label'] }}</td>
+                                <td class="px-3 py-3 text-right tabular-nums">{{ $group['workloads_filled'] }} / {{ $group['workloads_total'] }}</td>
+                                <td class="px-3 py-3 text-right tabular-nums">{{ number_format($group['entry_count']) }}</td>
+                                <td class="px-3 py-3 text-right tabular-nums">{{ number_format($group['hours'], 1) }}</td>
+                                <td class="px-6 py-3 text-right tabular-nums">
+                                    {{ number_format($group['score'], 2) }}
+                                    @if ($group['max_score'] !== null)
+                                        <span class="text-zinc-400">/ {{ number_format($group['max_score'], 2) }}</span>
+                                        <div class="mt-1 ml-auto h-1 w-24 overflow-hidden rounded-full bg-zinc-100 dark:bg-zinc-700">
+                                            <div
+                                                class="h-full rounded-full bg-blue-500"
+                                                style="width: {{ $group['max_score'] > 0 ? min(100, round($group['score'] / $group['max_score'] * 100)) : 0 }}%"
+                                            ></div>
+                                        </div>
+                                    @endif
+                                </td>
+                            </tr>
+                        @endforeach
+                    </tbody>
+                </table>
+            </div>
+        </section>
 
-                @if ($workRecord?->rejection_comment)
-                    <div class="mt-4 rounded-lg bg-red-50 p-4 text-sm text-red-700 dark:bg-red-950 dark:text-red-300">
-                        <strong>เหตุผลที่ส่งกลับ:</strong> {{ $workRecord->rejection_comment }}
+        {{-- Share links --}}
+        @if ($this->canManageShareLinks)
+            @php $shareLinks = $this->sharedWorkloadLinks; @endphp
+            <section
+                class="mb-6 rounded-2xl border border-zinc-200 bg-white dark:border-zinc-700 dark:bg-zinc-800"
+                x-data="{ allLinks: @js($shareLinks->map(fn (array $link) => trim($link['number'].' '.$link['name'])."\t".$link['url'])->implode("\n")) }"
+            >
+                <div class="flex flex-wrap items-start justify-between gap-3 px-6 pt-5 pb-4">
+                    <div class="min-w-0">
+                        <flux:heading>ลิงก์สรุปผลงานที่แชร์</flux:heading>
+                        <flux:text class="mt-1 max-w-prose">คัดลอกไปกรอกในระบบภายนอกได้ ผู้เปิดลิงก์ไม่ต้องล็อกอิน</flux:text>
+                    </div>
+                    @if ($shareLinks->isNotEmpty())
+                        <flux:button
+                            type="button"
+                            variant="primary"
+                            size="sm"
+                            icon="clipboard-document-list"
+                            x-on:click="window.copyText(allLinks).then(() => $wire.notifyShareLinkCopied())"
+                        >
+                            คัดลอกทั้งหมด ({{ $shareLinks->count() }})
+                        </flux:button>
+                    @endif
+                </div>
+
+                @if ($shareLinks->isNotEmpty())
+                    <ul class="divide-y divide-zinc-100 border-t border-zinc-100 dark:divide-zinc-700 dark:border-zinc-700">
+                        @foreach ($shareLinks as $link)
+                            <li
+                                wire:key="share-link-{{ $link['workload_id'] }}"
+                                class="group flex items-center gap-3 px-6 py-3 transition-colors hover:bg-zinc-50 dark:hover:bg-zinc-900/40"
+                                x-data="{ url: @js($link['url']) }"
+                            >
+                                <div class="min-w-0 flex-1">
+                                    <p class="truncate text-sm font-medium">{{ trim($link['number'].' '.$link['name']) }}</p>
+                                    <p class="truncate text-xs text-zinc-500">
+                                        {{ $link['group'] }}
+                                        @if ($link['main'])
+                                            <span class="mx-1">›</span>{{ $link['main'] }}
+                                        @endif
+                                    </p>
+                                    <p class="mt-1 truncate font-mono text-xs text-zinc-400 select-all">{{ $link['url'] }}</p>
+                                </div>
+                                <div class="flex shrink-0 items-center gap-1">
+                                    <flux:button
+                                        type="button"
+                                        variant="ghost"
+                                        size="sm"
+                                        icon="clipboard"
+                                        tooltip="คัดลอกลิงก์"
+                                        aria-label="คัดลอกลิงก์"
+                                        x-on:click="window.copyText(url).then(() => $wire.notifyShareLinkCopied())"
+                                    />
+                                    <flux:button
+                                        :href="$link['url']"
+                                        variant="ghost"
+                                        size="sm"
+                                        icon="arrow-top-right-on-square"
+                                        tooltip="เปิดลิงก์"
+                                        aria-label="เปิดลิงก์"
+                                        target="_blank"
+                                    />
+                                </div>
+                            </li>
+                        @endforeach
+                    </ul>
+                @else
+                    <div class="flex flex-wrap items-center justify-between gap-3 border-t border-zinc-100 px-6 py-4 text-sm text-zinc-500 dark:border-zinc-700">
+                        <span>ยังไม่มีลิงก์แชร์สำหรับบันทึกนี้</span>
+                        <flux:button
+                            wire:click="enableAllWorkloadShares"
+                            variant="primary"
+                            size="sm"
+                            icon="share"
+                            wire:loading.attr="disabled"
+                        >
+                            สร้างลิงก์ทุกภาระงาน
+                        </flux:button>
                     </div>
                 @endif
-            </div>
+            </section>
+        @endif
 
-            <div class="rounded-xl border border-zinc-200 bg-white p-6 dark:border-zinc-700 dark:bg-zinc-800">
-                <flux:heading size="lg" class="mb-4">การประเมินตนเอง</flux:heading>
-                <div class="space-y-4">
-                    <flux:field>
-                        <flux:label>สรุปการประเมินตนเอง</flux:label>
-                        <flux:textarea wire:model="selfAssessment" rows="5" :disabled="$readOnly" />
-                    </flux:field>
-                    <flux:field>
-                        <flux:label>คะแนนประเมินตนเอง</flux:label>
-                        <x-star-rating wire:model="selfScore" :score="$selfScore" :disabled="$readOnly" :readonly="$readOnly" />
-                    </flux:field>
-                </div>
-            </div>
-        </div>
-
-        <div class="mt-6 flex justify-between">
-            @unless ($readOnly)
-                <flux:button wire:click="goToStep(2)" variant="ghost">ย้อนกลับ</flux:button>
-                <div class="flex gap-2">
-                    <flux:button wire:click="saveDraft" variant="ghost" wire:loading.attr="disabled">บันทึกฉบับร่าง</flux:button>
-                    <flux:button wire:click="submit" variant="primary" wire:loading.attr="disabled">ส่งบันทึก</flux:button>
-                </div>
-            @else
-                <flux:button :href="route('staff.records.index')" variant="ghost" wire:navigate>กลับ</flux:button>
-                <div class="flex flex-col items-end gap-2">
-                    @if ($this->withdrawUnavailableMessage)
-                        <p class="text-sm text-zinc-500 dark:text-zinc-400">{{ $this->withdrawUnavailableMessage }}</p>
-                    @endif
-                    <div class="flex flex-wrap justify-end gap-2">
-                        <flux:button wire:click="goToStep(2)" variant="filled" icon="clipboard-document-list">
-                            ดูรายการผลงาน
+        {{-- Actions --}}
+        <div class="sticky bottom-0 z-10 -mx-4 border-t border-zinc-200 bg-white/90 px-4 py-3 backdrop-blur sm:mx-0 sm:rounded-2xl sm:border dark:border-zinc-700 dark:bg-zinc-800/90">
+            <div class="flex flex-wrap items-center justify-between gap-3">
+                @unless ($readOnly)
+                    <flux:button wire:click="goToStep(2)" variant="ghost" icon="arrow-left">ย้อนกลับ</flux:button>
+                    <div class="flex gap-2">
+                        <flux:button wire:click="saveDraft" variant="ghost" wire:loading.attr="disabled">บันทึกฉบับร่าง</flux:button>
+                        <flux:button
+                            wire:click="submit"
+                            variant="primary"
+                            icon-trailing="paper-airplane"
+                            wire:loading.attr="disabled"
+                            :disabled="$this->totalEntriesCount === 0"
+                        >
+                            ส่งบันทึก
                         </flux:button>
-                        @if ($workRecord)
-                            <flux:button :href="route('staff.records.print', $workRecord)" variant="primary" icon="printer" target="_blank">
-                                พิมพ์
+                    </div>
+                @else
+                    <flux:button :href="route('staff.records.index')" variant="ghost" icon="arrow-left" wire:navigate>กลับ</flux:button>
+                    <div class="flex flex-col items-end gap-1">
+                        <div class="flex flex-wrap justify-end gap-2">
+                            <flux:button wire:click="goToStep(2)" variant="ghost" icon="clipboard-document-list">
+                                ดูรายการผลงาน
                             </flux:button>
-                        @endif
-                        @if ($this->canWithdraw)
-                            <flux:button
-                                wire:click="openWithdrawConfirm"
-                                variant="danger"
-                                icon="arrow-uturn-left"
-                                wire:loading.attr="disabled"
-                            >
-                                ถอนการส่ง
-                            </flux:button>
+                            @if ($workRecord)
+                                <flux:button :href="route('staff.records.print', $workRecord)" variant="filled" icon="printer" target="_blank">
+                                    พิมพ์
+                                </flux:button>
+                            @endif
+                            @if ($this->canWithdraw)
+                                <flux:button
+                                    wire:click="openWithdrawConfirm"
+                                    variant="danger"
+                                    icon="arrow-uturn-left"
+                                    wire:loading.attr="disabled"
+                                >
+                                    ถอนการส่ง
+                                </flux:button>
+                            @endif
+                        </div>
+                        @if ($this->withdrawUnavailableMessage)
+                            <p class="text-xs text-zinc-500 dark:text-zinc-400">{{ $this->withdrawUnavailableMessage }}</p>
                         @endif
                     </div>
-                </div>
-            @endunless
+                @endunless
+            </div>
         </div>
     @endif
 
@@ -1976,19 +2190,19 @@ new class extends Component
 
     @script
     <script>
-        let step3ScoreChart = null;
+        let step3RadarChart = null;
         let step3HoursChart = null;
         let step3ProgressChart = null;
 
         const step3HoursColors = ['#60a5fa', '#34d399', '#fbbf24', '#fb7185', '#a78bfa', '#22d3ee'];
 
         function destroyStep3Charts() {
-            [step3ScoreChart, step3HoursChart, step3ProgressChart].forEach((chart) => {
+            [step3RadarChart, step3HoursChart, step3ProgressChart].forEach((chart) => {
                 if (chart) {
                     chart.destroy();
                 }
             });
-            step3ScoreChart = null;
+            step3RadarChart = null;
             step3HoursChart = null;
             step3ProgressChart = null;
         }
@@ -2013,58 +2227,47 @@ new class extends Component
                 return;
             }
 
-            const scoreCanvas = document.getElementById('step3ScoreChart');
+            const radarCanvas = document.getElementById('step3RadarChart');
             const hoursCanvas = document.getElementById('step3HoursChart');
             const progressCanvas = document.getElementById('step3ProgressChart');
 
-            if (!scoreCanvas || !hoursCanvas || !progressCanvas) {
+            if (!radarCanvas || !hoursCanvas || !progressCanvas) {
                 return;
             }
 
             destroyStep3Charts();
 
-            const score = data.scoreByGroup ?? { labels: [], earned: [], max: [] };
-            const hasMax = (score.max ?? []).some((value) => value !== null);
-            const scoreDatasets = [];
+            const radar = data.hoursRadar ?? { labels: [], values: [] };
 
-            if (hasMax) {
-                scoreDatasets.push({
-                    label: 'คะแนนสูงสุด',
-                    data: score.max.map((value) => value ?? 0),
-                    backgroundColor: '#e4e4e7',
-                    borderRadius: 6,
-                    order: 2,
-                });
-            }
-
-            scoreDatasets.push({
-                label: 'คะแนนที่ได้',
-                data: score.earned,
-                backgroundColor: '#a855f7',
-                borderRadius: 6,
-                order: 1,
-            });
-
-            step3ScoreChart = new Chart(scoreCanvas, {
-                type: 'bar',
+            step3RadarChart = new Chart(radarCanvas, {
+                type: 'radar',
                 data: {
-                    labels: score.labels,
-                    datasets: scoreDatasets,
+                    labels: radar.labels,
+                    datasets: [{
+                        label: 'จำนวนงาน',
+                        data: radar.values,
+                        backgroundColor: 'rgba(168, 85, 247, 0.2)',
+                        borderColor: '#a855f7',
+                        pointBackgroundColor: '#a855f7',
+                        borderWidth: 2,
+                    }],
                 },
                 options: {
-                    indexAxis: 'y',
                     responsive: true,
                     maintainAspectRatio: false,
                     plugins: {
-                        legend: { display: hasMax },
+                        legend: { display: false },
                         tooltip: {
                             callbacks: {
-                                label: (ctx) => `${ctx.dataset.label}: ${ctx.parsed.x.toFixed(2)} คะแนน`,
+                                label: (ctx) => `${ctx.label}: ${ctx.parsed.r.toFixed(1)} งาน`,
                             },
                         },
                     },
                     scales: {
-                        x: { beginAtZero: true },
+                        r: {
+                            beginAtZero: true,
+                            ticks: { precision: 0 },
+                        },
                     },
                 },
             });

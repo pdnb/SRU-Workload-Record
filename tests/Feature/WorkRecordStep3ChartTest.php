@@ -73,10 +73,10 @@ class WorkRecordStep3ChartTest extends TestCase
             ->set('modalEntry.hours', '3')
             ->call('saveModalEntry')
             ->call('goToStep', 3)
-            ->assertSee('คะแนนตามกลุ่มภาระงาน')
+            ->assertSee('จำนวนงานตามกลุ่มภาระงาน')
             ->assertSee('สัดส่วนงาน')
             ->assertSee('ความคืบหน้าภาระงาน')
-            ->assertSeeHtml('id="step3ScoreChart"')
+            ->assertSeeHtml('id="step3RadarChart"')
             ->assertSeeHtml('id="step3HoursChart"')
             ->assertSeeHtml('id="step3ProgressChart"');
     }
@@ -98,9 +98,8 @@ class WorkRecordStep3ChartTest extends TestCase
         $data = $component->get('step3ChartData');
 
         $this->assertTrue($data['hasEntries']);
-        $this->assertSame(['1 '.$group->name], $data['scoreByGroup']['labels']);
-        $this->assertSame([30.0], $data['scoreByGroup']['earned']);
-        $this->assertSame([100.0], $data['scoreByGroup']['max']);
+        $this->assertSame(['1 '.$group->name], $data['hoursRadar']['labels']);
+        $this->assertSame([3.0], $data['hoursRadar']['values']);
         $this->assertSame(['1 '.$group->name], $data['hoursByGroup']['labels']);
         $this->assertSame([3.0], $data['hoursByGroup']['values']);
         $this->assertSame(1, $data['progress']['filled']);
@@ -121,10 +120,11 @@ class WorkRecordStep3ChartTest extends TestCase
 
         $this->assertFalse($data['hasEntries']);
         $this->assertSame([], $data['hoursByGroup']['values']);
+        $this->assertSame([0.0], $data['hoursRadar']['values']);
         $this->assertSame(0, $data['progress']['filled']);
 
         $component
             ->assertSee('ยังไม่บันทึกงาน')
-            ->assertSeeHtml('id="step3ScoreChart"');
+            ->assertSeeHtml('id="step3RadarChart"');
     }
 }

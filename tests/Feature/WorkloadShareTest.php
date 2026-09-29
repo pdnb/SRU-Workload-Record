@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Actions\EnableAllWorkloadShares;
 use App\Enums\EvaluationPeriodNumber;
 use App\Enums\EvidenceType;
 use App\Enums\PeriodStatus;
@@ -311,6 +312,95 @@ class WorkloadShareTest extends TestCase
             ->html();
 
         $this->assertStringNotContainsString('@js(', $html);
-        $this->assertStringContainsString('navigator.clipboard.writeText(shareUrl)', $html);
+        $this->assertStringContainsString('window.copyText(shareUrl)', $html);
+    }
+
+    public function test_submit_enables_share_for_every_workload_with_entries(): void
+    {
+        $data = $this->createSubmittedRecordWithEvidence();
+        $data['record']->update(['status' => WorkRecordStatus::Draft, 'submitted_at' => null]);
+
+        Livewire::actingAs($data['owner'])
+            ->test('pages::staff.work-record-form', ['record' => $data['record']])
+            ->call('submit')
+            ->assertRedirect(route('staff.records.show', $data['record']));
+
+        $shares = WorkloadShare::query()->where('work_record_id', $data['record']->id)->get();
+
+        $this->assertCount(2, $shares);
+        $this->assertTrue($shares->every(fn (WorkloadShare $share) => $share->isEnabled()));
+
+        foreach ($shares as $share) {
+            $this->get(route('share.workload.show', $share->token))->assertOk();
+        }
+    }
+
+    public function test_resubmit_after_withdraw_keeps_existing_share_tokens(): void
+    {
+        $data = $this->createSubmittedRecordWithEvidence();
+
+        $share = WorkloadShare::create([
+            'work_record_id' => $data['record']->id,
+            'workload_id' => $data['workload']->id,
+            'token' => (string) str()->uuid(),
+            'enabled_at' => null,
+        ]);
+
+        $data['record']->update(['status' => WorkRecordStatus::Draft, 'submitted_at' => null]);
+
+        Livewire::actingAs($data['owner'])
+            ->test('pages::staff.work-record-form', ['record' => $data['record']])
+            ->call('submit');
+
+        $refreshed = $share->fresh();
+
+        $this->assertSame($share->token, $refreshed->token);
+        $this->assertTrue($refreshed->isEnabled());
+        $this->get(route('share.workload.show', $share->token))->assertOk();
+    }
+
+    public function test_submitted_record_summary_lists_all_share_links(): void
+    {
+        $data = $this->createSubmittedRecordWithEvidence();
+
+        app(EnableAllWorkloadShares::class)($data['record']);
+
+        $component = Livewire::actingAs($data['owner'])
+            ->test('pages::staff.work-record-form', ['record' => $data['record']])
+            ->assertSee('ลิงก์สรุปผลงานที่แชร์')
+            ->assertSee('คัดลอกทั้งหมด');
+
+        foreach (WorkloadShare::query()->get() as $share) {
+            $component->assertSee($share->shareUrl());
+        }
+
+        $this->assertCount(2, $component->get('sharedWorkloadLinks'));
+    }
+
+    public function test_submitted_record_without_links_can_generate_all(): void
+    {
+        $data = $this->createSubmittedRecordWithEvidence();
+
+        Livewire::actingAs($data['owner'])
+            ->test('pages::staff.work-record-form', ['record' => $data['record']])
+            ->assertSee('สร้างลิงก์ทุกภาระงาน')
+            ->call('enableAllWorkloadShares')
+            ->assertSee('คัดลอกทั้งหมด');
+
+        $this->assertSame(2, WorkloadShare::query()->whereNotNull('enabled_at')->count());
+    }
+
+    public function test_draft_record_does_not_show_share_links_card(): void
+    {
+        $data = $this->createSubmittedRecordWithEvidence();
+        $data['record']->update(['status' => WorkRecordStatus::Draft, 'submitted_at' => null]);
+
+        Livewire::actingAs($data['owner'])
+            ->test('pages::staff.work-record-form', ['record' => $data['record']])
+            ->set('step', 3)
+            ->assertDontSee('ลิงก์สรุปผลงานที่แชร์')
+            ->call('enableAllWorkloadShares');
+
+        $this->assertDatabaseCount('workload_shares', 0);
     }
 }

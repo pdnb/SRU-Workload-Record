@@ -83,23 +83,6 @@
         <p>ไม่มีรายการผลงาน</p>
     @endforelse
 
-    @if ($record->self_assessment || $record->self_score)
-        <div class="summary">
-            <h2 style="margin-top: 0; border: none;">การประเมินตนเอง</h2>
-            @if ($record->self_assessment)
-                <p style="white-space: pre-wrap;">{{ $record->self_assessment }}</p>
-            @endif
-            @if ($record->self_score)
-                <p style="margin-top: 8px;">
-                    คะแนนประเมินตนเอง:
-                    @for ($i = 1; $i <= 5; $i++)
-                        <span style="color: {{ $i <= $record->self_score ? '#eab308' : '#d4d4d4' }}; font-size: 18px;">★</span>
-                    @endfor
-                </p>
-            @endif
-        </div>
-    @endif
-
     <p class="meta" style="margin-top: 32px;">
         รวม {{ $record->workEntries->count() }} รายการ · {{ number_format($record->workEntries->sum('hours'), 1) }} งาน
     </p>

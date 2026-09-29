@@ -187,7 +187,5 @@ return [
         'password' => 'รหัสผ่าน',
         'name' => 'ชื่อ',
         'current_password' => 'รหัสผ่านปัจจุบัน',
-        'selfAssessment' => 'การประเมินตนเอง',
-        'selfScore' => 'คะแนนประเมินตนเอง',
     ],
 ];

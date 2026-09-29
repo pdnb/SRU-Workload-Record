@@ -10,10 +10,10 @@ use App\Models\EvaluationPeriod;
 use App\Models\FiscalYear;
 use App\Models\User;
 use App\Models\WorkEntry;
-use App\Models\WorkRecord;
 use App\Models\Workload;
 use App\Models\WorkloadGroup;
 use App\Models\WorkloadMain;
+use App\Models\WorkRecord;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
 use Tests\TestCase;
@@ -27,7 +27,7 @@ class StaffDashboardTest extends TestCase
      */
     private function createDashboardContext(): array
     {
-        $user = User::factory()->create(['role' => UserRole::Staff]);
+        $user = User::factory()->create(['position_id' => $this->defaultPosition()->id, 'role' => UserRole::Staff]);
 
         $fiscalYear = FiscalYear::create(['year' => 2568, 'is_active' => true]);
 
@@ -41,7 +41,7 @@ class StaffDashboardTest extends TestCase
         ]);
 
         $group = WorkloadGroup::create([
-            'fiscal_year_id' => $fiscalYear->id,
+            'workload_structure_id' => $this->structureFor($fiscalYear->id)->id,
             'name' => 'กลุ่มทดสอบ',
             'max_score' => 100,
             'sort_order' => 1,
@@ -71,7 +71,7 @@ class StaffDashboardTest extends TestCase
 
     public function test_staff_can_access_dashboard(): void
     {
-        $user = User::factory()->create(['role' => UserRole::Staff]);
+        $user = User::factory()->create(['position_id' => $this->defaultPosition()->id, 'role' => UserRole::Staff]);
 
         $this->actingAs($user)
             ->get(route('staff.dashboard'))
@@ -135,7 +135,7 @@ class StaffDashboardTest extends TestCase
 
     public function test_shows_empty_state_when_no_record(): void
     {
-        $user = User::factory()->create(['role' => UserRole::Staff]);
+        $user = User::factory()->create(['position_id' => $this->defaultPosition()->id, 'role' => UserRole::Staff]);
 
         $fiscalYear = FiscalYear::create(['year' => 2568, 'is_active' => true]);
 

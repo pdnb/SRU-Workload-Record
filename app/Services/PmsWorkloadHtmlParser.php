@@ -104,6 +104,26 @@ class PmsWorkloadHtmlParser
     }
 
     /**
+     * Reads the "ตำแหน่งที่ประเมินผลการปฏิบัติงาน" row, e.g. "0901: นักวิชาการคอมพิวเตอร์-ปฏิบัติการ".
+     *
+     * @return array{code: string, name: string}|null
+     */
+    public function parsePosition(string $html): ?array
+    {
+        if (! preg_match('/ตำแหน่งที่ประเมินผลการปฏิบัติงาน<\/nobr>.*?<nobr>(.*?)<\/nobr>/s', $html, $m)) {
+            return null;
+        }
+
+        $text = $this->decodeHtmlText($m[1]);
+
+        if (! preg_match('/^\s*([^:]+?)\s*:\s*(.+?)\s*$/u', $text, $parts)) {
+            return null;
+        }
+
+        return ['code' => $parts[1], 'name' => $parts[2]];
+    }
+
+    /**
      * @param  list<array{name: string, max_score: float, mains: array<string, list<array{name: string, score: float}>>}>  $structure
      * @return array{groups: int, mains: int, workloads: int}
      */

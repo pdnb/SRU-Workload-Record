@@ -15,7 +15,7 @@ class CloneWorkloadGroup
             $group->load(['workloadMains.workloads']);
 
             $clone = WorkloadGroup::create([
-                'fiscal_year_id' => $group->fiscal_year_id,
+                'workload_structure_id' => $group->workload_structure_id,
                 'name' => $group->name.' (สำเนา)',
                 'max_score' => $group->max_score,
                 'sort_order' => $group->sort_order + 1,

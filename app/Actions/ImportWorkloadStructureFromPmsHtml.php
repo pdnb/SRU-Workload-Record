@@ -2,10 +2,10 @@
 
 namespace App\Actions;
 
-use App\Models\FiscalYear;
 use App\Models\Workload;
 use App\Models\WorkloadGroup;
 use App\Models\WorkloadMain;
+use App\Models\WorkloadStructure;
 use Illuminate\Support\Facades\DB;
 
 class ImportWorkloadStructureFromPmsHtml
@@ -13,22 +13,26 @@ class ImportWorkloadStructureFromPmsHtml
     /**
      * @param  list<array{name: string, max_score: float, mains: array<string, list<array{name: string, score: float}>>}>  $structure
      */
-    public function __invoke(FiscalYear $fiscalYear, array $structure, bool $replaceExisting = false): void
+    public function __invoke(WorkloadStructure $target, array $structure, bool $replaceExisting = false): void
     {
-        DB::transaction(function () use ($fiscalYear, $structure, $replaceExisting) {
-            $existingGroups = WorkloadGroup::where('fiscal_year_id', $fiscalYear->id)->exists();
+        DB::transaction(function () use ($target, $structure, $replaceExisting) {
+            if ($target->isFromOracle()) {
+                throw new \RuntimeException('structure_is_oracle');
+            }
+
+            $existingGroups = WorkloadGroup::where('workload_structure_id', $target->id)->exists();
 
             if ($existingGroups && ! $replaceExisting) {
                 throw new \RuntimeException('fiscal_year_has_structure');
             }
 
             if ($existingGroups && $replaceExisting) {
-                WorkloadGroup::where('fiscal_year_id', $fiscalYear->id)->delete();
+                WorkloadGroup::where('workload_structure_id', $target->id)->delete();
             }
 
             foreach ($structure as $gIndex => $groupData) {
                 $group = WorkloadGroup::create([
-                    'fiscal_year_id' => $fiscalYear->id,
+                    'workload_structure_id' => $target->id,
                     'name' => $groupData['name'],
                     'max_score' => $groupData['max_score'],
                     'sort_order' => $gIndex + 1,

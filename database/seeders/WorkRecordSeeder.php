@@ -67,7 +67,8 @@ class WorkRecordSeeder extends Seeder
 
         WorkRecord::unguard();
         foreach ($records as $record) {
-            WorkRecord::create($record);
+            $created = WorkRecord::create($record);
+            $created->update(['workload_structure_id' => $created->resolvedStructureId()]);
         }
         WorkRecord::reguard();
     }

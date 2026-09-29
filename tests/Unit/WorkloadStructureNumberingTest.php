@@ -19,7 +19,7 @@ class WorkloadStructureNumberingTest extends TestCase
         $fiscalYear = FiscalYear::create(['year' => 2568, 'is_active' => true]);
 
         $group1 = WorkloadGroup::create([
-            'fiscal_year_id' => $fiscalYear->id,
+            'workload_structure_id' => $this->structureFor($fiscalYear->id)->id,
             'name' => 'กลุ่ม 1',
             'sort_order' => 1,
         ]);
@@ -55,7 +55,7 @@ class WorkloadStructureNumberingTest extends TestCase
         ]);
 
         $group2 = WorkloadGroup::create([
-            'fiscal_year_id' => $fiscalYear->id,
+            'workload_structure_id' => $this->structureFor($fiscalYear->id)->id,
             'name' => 'กลุ่ม 2',
             'sort_order' => 2,
         ]);
@@ -73,7 +73,7 @@ class WorkloadStructureNumberingTest extends TestCase
         ]);
 
         $groups = WorkloadGroup::query()
-            ->forFiscalYear($fiscalYear->id)
+            ->forStructure($this->structureFor($fiscalYear)->id)
             ->with(['workloadMains.workloads'])
             ->get();
 
@@ -95,7 +95,7 @@ class WorkloadStructureNumberingTest extends TestCase
         $fiscalYear = FiscalYear::create(['year' => 2569, 'is_active' => true]);
 
         $group = WorkloadGroup::create([
-            'fiscal_year_id' => $fiscalYear->id,
+            'workload_structure_id' => $this->structureFor($fiscalYear->id)->id,
             'name' => 'กลุ่ม',
             'sort_order' => 10,
         ]);
@@ -113,7 +113,7 @@ class WorkloadStructureNumberingTest extends TestCase
         ]);
 
         $groups = WorkloadGroup::query()
-            ->forFiscalYear($fiscalYear->id)
+            ->forStructure($this->structureFor($fiscalYear)->id)
             ->with(['workloadMains.workloads'])
             ->get();
 

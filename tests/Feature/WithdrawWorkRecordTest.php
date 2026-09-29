@@ -29,8 +29,8 @@ class WithdrawWorkRecordTest extends TestCase
      */
     private function createSubmittedRecord(): array
     {
-        $owner = User::factory()->create(['role' => UserRole::Staff]);
-        $otherStaff = User::factory()->create(['role' => UserRole::Staff]);
+        $owner = User::factory()->create(['position_id' => $this->defaultPosition()->id, 'role' => UserRole::Staff]);
+        $otherStaff = User::factory()->create(['position_id' => $this->defaultPosition()->id, 'role' => UserRole::Staff]);
 
         $fiscalYear = FiscalYear::create(['year' => 2568, 'is_active' => true]);
 
@@ -44,7 +44,7 @@ class WithdrawWorkRecordTest extends TestCase
         ]);
 
         $group = WorkloadGroup::create([
-            'fiscal_year_id' => $fiscalYear->id,
+            'workload_structure_id' => $this->structureFor($fiscalYear->id)->id,
             'name' => 'กลุ่มทดสอบ',
             'sort_order' => 1,
         ]);

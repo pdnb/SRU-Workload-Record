@@ -47,9 +47,9 @@ class CalculateWorkRecordScore
             $earned += $groupTotal;
         }
 
-        $fiscalYearId = $record->evaluationPeriod->fiscal_year_id;
         $maximumSum = (float) WorkloadGroup::query()
-            ->where('fiscal_year_id', $fiscalYearId)
+            ->where('workload_structure_id', $record->resolvedStructureId())
+            ->active()
             ->whereNotNull('max_score')
             ->sum('max_score');
 

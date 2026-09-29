@@ -32,6 +32,9 @@
                     <flux:navbar.item :href="route('admin.workloads')" :current="request()->routeIs('admin.workloads')" wire:navigate>
                         โครงสร้างภาระงาน
                     </flux:navbar.item>
+                    <flux:navbar.item :href="route('admin.users')" :current="request()->routeIs('admin.users')" wire:navigate>
+                        ผู้ใช้และตำแหน่ง
+                    </flux:navbar.item>
                 @endif
             </flux:navbar>
         </div>
@@ -64,6 +67,7 @@
         @if ($user->isAdmin())
             <flux:button :href="route('admin.periods')" variant="ghost" size="sm" wire:navigate>รอบประเมิน</flux:button>
             <flux:button :href="route('admin.workloads')" variant="ghost" size="sm" wire:navigate>ภาระงาน</flux:button>
+            <flux:button :href="route('admin.users')" variant="ghost" size="sm" wire:navigate>ผู้ใช้</flux:button>
         @endif
     </nav>
 </header>

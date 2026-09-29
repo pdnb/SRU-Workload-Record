@@ -15,6 +15,7 @@ class WorkRecord extends Model
     protected $fillable = [
         'user_id',
         'evaluation_period_id',
+        'workload_structure_id',
         'status',
         'self_assessment',
         'self_score',
@@ -40,6 +41,30 @@ class WorkRecord extends Model
     public function evaluationPeriod(): BelongsTo
     {
         return $this->belongsTo(EvaluationPeriod::class);
+    }
+
+    public function workloadStructure(): BelongsTo
+    {
+        return $this->belongsTo(WorkloadStructure::class);
+    }
+
+    /**
+     * The snapshotted structure, falling back to the owner's current one for
+     * records created before the snapshot existed.
+     */
+    public function resolvedStructureId(): ?int
+    {
+        if ($this->workload_structure_id !== null) {
+            return $this->workload_structure_id;
+        }
+
+        $this->loadMissing(['user', 'evaluationPeriod']);
+
+        if ($this->user === null || $this->evaluationPeriod === null) {
+            return null;
+        }
+
+        return WorkloadStructure::forUserAndFiscalYear($this->user, $this->evaluationPeriod->fiscal_year_id)?->id;
     }
 
     public function workEntries(): HasMany

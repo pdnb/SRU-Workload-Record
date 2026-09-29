@@ -25,7 +25,7 @@ class WorkloadScoreTest extends TestCase
         $fiscalYear = FiscalYear::create(['year' => 2568, 'is_active' => true]);
 
         $group = WorkloadGroup::create([
-            'fiscal_year_id' => $fiscalYear->id,
+            'workload_structure_id' => $this->structureFor($fiscalYear->id)->id,
             'name' => 'กลุ่มทดสอบ',
             'sort_order' => 1,
         ]);
@@ -45,6 +45,7 @@ class WorkloadScoreTest extends TestCase
         Livewire::actingAs($admin)
             ->test('pages::admin.workload-manager')
             ->set('selectedFiscalYearId', $fiscalYear->id)
+            ->set('selectedPositionId', $this->defaultPosition()->id)
             ->call('openEditGroup', $group->id)
             ->set('groupMaxScore', '100')
             ->call('saveGroup')
@@ -70,7 +71,7 @@ class WorkloadScoreTest extends TestCase
         $fiscalYear = FiscalYear::create(['year' => 2568, 'is_active' => true]);
 
         $group = WorkloadGroup::create([
-            'fiscal_year_id' => $fiscalYear->id,
+            'workload_structure_id' => $this->structureFor($fiscalYear->id)->id,
             'name' => 'กลุ่มทดสอบ',
             'sort_order' => 1,
         ]);
@@ -100,7 +101,7 @@ class WorkloadScoreTest extends TestCase
         $source = FiscalYear::create(['year' => 2568, 'is_active' => true]);
 
         $group = WorkloadGroup::create([
-            'fiscal_year_id' => $source->id,
+            'workload_structure_id' => $this->structureFor($source->id)->id,
             'name' => 'กลุ่มทดสอบ',
             'max_score' => 100,
             'sort_order' => 1,
@@ -122,7 +123,7 @@ class WorkloadScoreTest extends TestCase
 
         $target = app(CopyStructureToNextFiscalYear::class)($source);
 
-        $targetGroup = WorkloadGroup::where('fiscal_year_id', $target->id)->first();
+        $targetGroup = WorkloadGroup::where('workload_structure_id', $this->structureFor($target->id)->id)->first();
         $targetMain = $targetGroup->workloadMains()->first();
         $targetWorkload = $targetMain->workloads()->first();
 

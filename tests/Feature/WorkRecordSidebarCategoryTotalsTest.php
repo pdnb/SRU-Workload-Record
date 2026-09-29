@@ -24,7 +24,7 @@ class WorkRecordSidebarCategoryTotalsTest extends TestCase
      */
     private function createContext(?float $mainMaxScore = null): array
     {
-        $user = User::factory()->create(['role' => UserRole::Staff]);
+        $user = User::factory()->create(['position_id' => $this->defaultPosition()->id, 'role' => UserRole::Staff]);
 
         $fiscalYear = FiscalYear::create(['year' => 2568, 'is_active' => true]);
 
@@ -38,7 +38,7 @@ class WorkRecordSidebarCategoryTotalsTest extends TestCase
         ]);
 
         $group = WorkloadGroup::create([
-            'fiscal_year_id' => $fiscalYear->id,
+            'workload_structure_id' => $this->structureFor($fiscalYear->id)->id,
             'name' => 'กลุ่มทดสอบ',
             'max_score' => 100,
             'sort_order' => 1,

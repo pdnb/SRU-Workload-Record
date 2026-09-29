@@ -53,6 +53,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::middleware('role:admin')->prefix('admin')->name('admin.')->group(function () {
         Route::livewire('periods', 'pages::admin.period-manager')->name('periods');
         Route::livewire('workloads', 'pages::admin.workload-manager')->name('workloads');
+        Route::livewire('users', 'pages::admin.user-manager')->name('users');
     });
 });
 

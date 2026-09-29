@@ -8,12 +8,14 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class WorkloadMain extends Model
 {
-    protected $fillable = ['workload_group_id', 'name', 'max_score', 'sort_order'];
+    protected $fillable = ['workload_group_id', 'external_id', 'name', 'max_score', 'sort_order', 'is_active', 'synced_at'];
 
     protected function casts(): array
     {
         return [
             'max_score' => 'decimal:2',
+            'is_active' => 'boolean',
+            'synced_at' => 'datetime',
         ];
     }
 

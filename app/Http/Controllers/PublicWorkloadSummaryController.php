@@ -29,7 +29,7 @@ class PublicWorkloadSummaryController
             ->get();
 
         $groups = WorkloadGroup::query()
-            ->forFiscalYear($record->evaluationPeriod->fiscal_year_id)
+            ->forStructure($record->resolvedStructureId())
             ->with(['workloadMains.workloads'])
             ->get();
 

@@ -11,10 +11,10 @@ use App\Models\EvaluationPeriod;
 use App\Models\FiscalYear;
 use App\Models\User;
 use App\Models\WorkEntry;
-use App\Models\WorkRecord;
 use App\Models\Workload;
 use App\Models\WorkloadGroup;
 use App\Models\WorkloadMain;
+use App\Models\WorkRecord;
 use App\Services\PmsWorkloadHtmlParser;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
@@ -51,6 +51,7 @@ class ImportWorkloadStructureTest extends TestCase
         Livewire::actingAs($admin)
             ->test('pages::admin.workload-manager')
             ->set('selectedFiscalYearId', $fiscalYear->id)
+            ->set('selectedPositionId', $this->defaultPosition()->id)
             ->call('openImportModal')
             ->set('pmsHtmlFile', $file)
             ->assertSet('importPreview.groups', 10)
@@ -59,9 +60,9 @@ class ImportWorkloadStructureTest extends TestCase
             ->call('importFromPmsHtml')
             ->assertHasNoErrors();
 
-        $this->assertSame(10, WorkloadGroup::where('fiscal_year_id', $fiscalYear->id)->count());
-        $this->assertSame(27, WorkloadMain::whereHas('workloadGroup', fn ($q) => $q->where('fiscal_year_id', $fiscalYear->id))->count());
-        $this->assertSame(151, Workload::whereHas('workloadMain.workloadGroup', fn ($q) => $q->where('fiscal_year_id', $fiscalYear->id))->count());
+        $this->assertSame(10, WorkloadGroup::where('workload_structure_id', $this->structureFor($fiscalYear->id)->id)->count());
+        $this->assertSame(27, WorkloadMain::whereHas('workloadGroup', fn ($q) => $q->where('workload_structure_id', $this->structureFor($fiscalYear->id)->id))->count());
+        $this->assertSame(151, Workload::whereHas('workloadMain.workloadGroup', fn ($q) => $q->where('workload_structure_id', $this->structureFor($fiscalYear->id)->id))->count());
     }
 
     public function test_import_fails_when_fiscal_year_already_has_structure_without_replace(): void
@@ -70,7 +71,7 @@ class ImportWorkloadStructureTest extends TestCase
         $fiscalYear = FiscalYear::create(['year' => 2569, 'is_active' => true]);
 
         WorkloadGroup::create([
-            'fiscal_year_id' => $fiscalYear->id,
+            'workload_structure_id' => $this->structureFor($fiscalYear->id)->id,
             'name' => 'กลุ่มเดิม',
             'sort_order' => 1,
         ]);
@@ -80,13 +81,14 @@ class ImportWorkloadStructureTest extends TestCase
         Livewire::actingAs($admin)
             ->test('pages::admin.workload-manager')
             ->set('selectedFiscalYearId', $fiscalYear->id)
+            ->set('selectedPositionId', $this->defaultPosition()->id)
             ->set('pmsHtmlFile', $file)
             ->set('replaceExistingOnImport', false)
             ->call('importFromPmsHtml')
             ->assertHasNoErrors();
 
-        $this->assertSame(1, WorkloadGroup::where('fiscal_year_id', $fiscalYear->id)->count());
-        $this->assertSame('กลุ่มเดิม', WorkloadGroup::where('fiscal_year_id', $fiscalYear->id)->value('name'));
+        $this->assertSame(1, WorkloadGroup::where('workload_structure_id', $this->structureFor($fiscalYear->id)->id)->count());
+        $this->assertSame('กลุ่มเดิม', WorkloadGroup::where('workload_structure_id', $this->structureFor($fiscalYear->id)->id)->value('name'));
     }
 
     public function test_import_replaces_existing_structure(): void
@@ -95,7 +97,7 @@ class ImportWorkloadStructureTest extends TestCase
         $fiscalYear = FiscalYear::create(['year' => 2569, 'is_active' => true]);
 
         $group = WorkloadGroup::create([
-            'fiscal_year_id' => $fiscalYear->id,
+            'workload_structure_id' => $this->structureFor($fiscalYear->id)->id,
             'name' => 'กลุ่มเดิม',
             'sort_order' => 1,
         ]);
@@ -112,7 +114,7 @@ class ImportWorkloadStructureTest extends TestCase
             'sort_order' => 1,
         ]);
 
-        $user = User::factory()->create(['role' => UserRole::Staff]);
+        $user = User::factory()->create(['position_id' => $this->defaultPosition()->id, 'role' => UserRole::Staff]);
 
         $period = EvaluationPeriod::create([
             'fiscal_year_id' => $fiscalYear->id,
@@ -141,20 +143,21 @@ class ImportWorkloadStructureTest extends TestCase
         Livewire::actingAs($admin)
             ->test('pages::admin.workload-manager')
             ->set('selectedFiscalYearId', $fiscalYear->id)
+            ->set('selectedPositionId', $this->defaultPosition()->id)
             ->set('pmsHtmlFile', $file)
             ->set('replaceExistingOnImport', true)
             ->call('importFromPmsHtml')
             ->assertHasNoErrors();
 
-        $this->assertSame(10, WorkloadGroup::where('fiscal_year_id', $fiscalYear->id)->count());
+        $this->assertSame(10, WorkloadGroup::where('workload_structure_id', $this->structureFor($fiscalYear->id)->id)->count());
         $this->assertDatabaseMissing('workloads', ['id' => $workload->id]);
         $this->assertDatabaseMissing('work_entries', ['workload_id' => $workload->id]);
-        $this->assertNotSame('กลุ่มเดิม', WorkloadGroup::where('fiscal_year_id', $fiscalYear->id)->value('name'));
+        $this->assertNotSame('กลุ่มเดิม', WorkloadGroup::where('workload_structure_id', $this->structureFor($fiscalYear->id)->id)->value('name'));
     }
 
     public function test_non_admin_cannot_access_workload_manager(): void
     {
-        $staff = User::factory()->create(['role' => UserRole::Staff]);
+        $staff = User::factory()->create(['position_id' => $this->defaultPosition()->id, 'role' => UserRole::Staff]);
 
         $this->actingAs($staff)
             ->get('/admin/workloads')
@@ -166,7 +169,7 @@ class ImportWorkloadStructureTest extends TestCase
         $fiscalYear = FiscalYear::create(['year' => 2569, 'is_active' => true]);
 
         WorkloadGroup::create([
-            'fiscal_year_id' => $fiscalYear->id,
+            'workload_structure_id' => $this->structureFor($fiscalYear->id)->id,
             'name' => 'กลุ่มเดิม',
             'sort_order' => 1,
         ]);
@@ -177,6 +180,6 @@ class ImportWorkloadStructureTest extends TestCase
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage('fiscal_year_has_structure');
 
-        app(ImportWorkloadStructureFromPmsHtml::class)($fiscalYear, $structure, false);
+        app(ImportWorkloadStructureFromPmsHtml::class)($this->structureFor($fiscalYear), $structure, false);
     }
 }

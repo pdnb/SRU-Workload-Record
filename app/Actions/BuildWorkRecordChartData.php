@@ -20,11 +20,9 @@ class BuildWorkRecordChartData
             'evaluationPeriod',
         ]);
 
-        $fiscalYearId = $record->evaluationPeriod->fiscal_year_id;
-
         $groups = WorkloadGroup::query()
-            ->forFiscalYear($fiscalYearId)
-            ->with(['workloadMains.workloads'])
+            ->forStructure($record->resolvedStructureId())
+            ->withActiveTree()
             ->get();
 
         $numbers = WorkloadStructureNumbering::buildMap($groups);

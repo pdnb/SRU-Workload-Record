@@ -2,17 +2,19 @@
 
 namespace App\Providers;
 
-use App\Socialite\Providers\UAppOAuthProvider;
+use App\Contracts\WorkloadSourceReader;
 use App\Models\EvaluationPeriod;
 use App\Models\FiscalYear;
 use App\Models\User;
-use App\Models\WorkRecord;
 use App\Models\WorkloadGroup;
 use App\Models\WorkloadShare;
+use App\Models\WorkRecord;
 use App\Policies\EvaluationPeriodPolicy;
-use App\Policies\WorkRecordPolicy;
 use App\Policies\WorkloadSharePolicy;
 use App\Policies\WorkloadStructurePolicy;
+use App\Policies\WorkRecordPolicy;
+use App\Services\Oracle\OracleWorkloadReader;
+use App\Socialite\Providers\UAppOAuthProvider;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
 use Laravel\Socialite\Contracts\Factory as SocialiteFactory;
@@ -22,7 +24,7 @@ class AppServiceProvider extends ServiceProvider
 {
     public function register(): void
     {
-        //
+        $this->app->bind(WorkloadSourceReader::class, OracleWorkloadReader::class);
     }
 
     public function boot(): void

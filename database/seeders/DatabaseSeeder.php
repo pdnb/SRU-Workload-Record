@@ -10,6 +10,7 @@ class DatabaseSeeder extends Seeder
     {
         $this->call([
             FiscalYearSeeder::class,
+            PositionSeeder::class,
             WorkloadStructureSeeder::class,
             UserSeeder::class,
             // WorkRecordSeeder::class,

@@ -5,13 +5,19 @@ namespace App\Actions;
 use App\Enums\PeriodStatus;
 use App\Models\EvaluationPeriod;
 use App\Models\FiscalYear;
-use App\Models\Workload;
 use App\Models\WorkloadGroup;
-use App\Models\WorkloadMain;
+use App\Models\WorkloadStructure;
 use Illuminate\Support\Facades\DB;
 
 class CopyStructureToNextFiscalYear
 {
+    public function __construct(
+        private CopyWorkloadGroupsToStructure $copyGroups,
+    ) {}
+
+    /**
+     * Copies every position's structure and all evaluation periods to year + 1.
+     */
     public function __invoke(FiscalYear $source, bool $replaceExisting = false): FiscalYear
     {
         return DB::transaction(function () use ($source, $replaceExisting) {
@@ -22,18 +28,19 @@ class CopyStructureToNextFiscalYear
                 ['is_active' => false],
             );
 
-            $existingGroups = WorkloadGroup::where('fiscal_year_id', $target->id)->exists();
+            $targetStructureIds = WorkloadStructure::where('fiscal_year_id', $target->id)->pluck('id');
+            $existingGroups = WorkloadGroup::whereIn('workload_structure_id', $targetStructureIds)->exists();
 
             if ($existingGroups && ! $replaceExisting) {
                 throw new \RuntimeException('target_has_structure');
             }
 
             if ($existingGroups && $replaceExisting) {
-                WorkloadGroup::where('fiscal_year_id', $target->id)->delete();
+                WorkloadGroup::whereIn('workload_structure_id', $targetStructureIds)->delete();
                 EvaluationPeriod::where('fiscal_year_id', $target->id)->delete();
             }
 
-            $source->load(['evaluationPeriods', 'workloadGroups.workloadMains.workloads']);
+            $source->load(['evaluationPeriods', 'workloadStructures.workloadGroups.workloadMains.workloads']);
 
             foreach ($source->evaluationPeriods as $period) {
                 EvaluationPeriod::create([
@@ -46,31 +53,13 @@ class CopyStructureToNextFiscalYear
                 ]);
             }
 
-            foreach ($source->workloadGroups as $group) {
-                $newGroup = WorkloadGroup::create([
-                    'fiscal_year_id' => $target->id,
-                    'name' => $group->name,
-                    'max_score' => $group->max_score,
-                    'sort_order' => $group->sort_order,
-                ]);
+            foreach ($source->workloadStructures as $structure) {
+                $targetStructure = WorkloadStructure::firstOrCreate(
+                    ['fiscal_year_id' => $target->id, 'position_id' => $structure->position_id],
+                    ['name' => $structure->name],
+                );
 
-                foreach ($group->workloadMains as $main) {
-                    $newMain = WorkloadMain::create([
-                        'workload_group_id' => $newGroup->id,
-                        'name' => $main->name,
-                        'max_score' => $main->max_score,
-                        'sort_order' => $main->sort_order,
-                    ]);
-
-                    foreach ($main->workloads as $workload) {
-                        Workload::create([
-                            'workload_main_id' => $newMain->id,
-                            'name' => $workload->name,
-                            'score' => $workload->score,
-                            'sort_order' => $workload->sort_order,
-                        ]);
-                    }
-                }
+                ($this->copyGroups)($structure->workloadGroups, $targetStructure);
             }
 
             return $target;

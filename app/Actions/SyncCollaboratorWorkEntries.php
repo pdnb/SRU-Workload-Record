@@ -6,20 +6,26 @@ use App\Enums\UserRole;
 use App\Enums\WorkRecordStatus;
 use App\Models\User;
 use App\Models\WorkEntry;
+use App\Models\WorkloadStructure;
 use App\Models\WorkRecord;
 
 class SyncCollaboratorWorkEntries
 {
     /**
+     * Collaborators whose workload structure does not contain the source workload
+     * are reported in `mismatched` and get no mirror (and no empty record).
+     *
      * @param  list<int>  $collaboratorUserIds
-     * @return array{synced: list<int>, skipped: list<array{id: int, name: string}>}
+     * @return array{synced: list<int>, skipped: list<array{id: int, name: string}>, mismatched: list<array{id: int, name: string}>}
      */
     public function __invoke(WorkEntry $sourceEntry, array $collaboratorUserIds): array
     {
-        $sourceEntry->loadMissing(['workRecord', 'evidences', 'mirroredEntries.workRecord']);
+        $sourceEntry->loadMissing(['workRecord.evaluationPeriod', 'workload.workloadMain.workloadGroup', 'evidences', 'mirroredEntries.workRecord']);
 
         $ownerUserId = $sourceEntry->workRecord->user_id;
         $periodId = $sourceEntry->workRecord->evaluation_period_id;
+        $fiscalYearId = $sourceEntry->workRecord->evaluationPeriod->fiscal_year_id;
+        $workloadStructureId = $sourceEntry->workload->workloadMain->workloadGroup->workload_structure_id;
 
         $ids = collect($collaboratorUserIds)
             ->map(fn ($id) => (int) $id)
@@ -31,11 +37,12 @@ class SyncCollaboratorWorkEntries
             ->whereIn('id', $ids)
             ->where('role', UserRole::Staff)
             ->orderBy('name')
-            ->get(['id', 'name'])
+            ->get(['id', 'name', 'position_id'])
             ->keyBy('id');
 
         $synced = [];
         $skipped = [];
+        $mismatched = [];
         $keptMirrorRecordIds = [];
 
         foreach ($ids as $userId) {
@@ -45,10 +52,26 @@ class SyncCollaboratorWorkEntries
                 continue;
             }
 
-            $record = WorkRecord::firstOrCreate(
-                ['user_id' => $userId, 'evaluation_period_id' => $periodId],
-                ['status' => WorkRecordStatus::Draft],
-            );
+            $record = WorkRecord::query()
+                ->where('user_id', $userId)
+                ->where('evaluation_period_id', $periodId)
+                ->first();
+
+            $collaboratorStructureId = $record?->resolvedStructureId()
+                ?? WorkloadStructure::forUserAndFiscalYear($user, $fiscalYearId)?->id;
+
+            if ($collaboratorStructureId !== $workloadStructureId) {
+                $mismatched[] = ['id' => $user->id, 'name' => $user->name];
+
+                continue;
+            }
+
+            $record ??= WorkRecord::create([
+                'user_id' => $userId,
+                'evaluation_period_id' => $periodId,
+                'workload_structure_id' => $collaboratorStructureId,
+                'status' => WorkRecordStatus::Draft,
+            ]);
 
             if (! $record->isEditable()) {
                 $skipped[] = ['id' => $user->id, 'name' => $user->name];
@@ -86,7 +109,7 @@ class SyncCollaboratorWorkEntries
             ->get()
             ->each(fn (WorkEntry $entry) => $entry->delete());
 
-        return ['synced' => $synced, 'skipped' => $skipped];
+        return ['synced' => $synced, 'skipped' => $skipped, 'mismatched' => $mismatched];
     }
 
     protected function syncEvidences(WorkEntry $source, WorkEntry $mirror): void

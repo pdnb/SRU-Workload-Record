@@ -27,7 +27,7 @@ class WorkRecordEvidenceUploadTest extends TestCase
      */
     private function createWorkRecordContext(): array
     {
-        $user = User::factory()->create(['role' => UserRole::Staff]);
+        $user = User::factory()->create(['position_id' => $this->defaultPosition()->id, 'role' => UserRole::Staff]);
 
         $fiscalYear = FiscalYear::create(['year' => 2568, 'is_active' => true]);
 
@@ -41,7 +41,7 @@ class WorkRecordEvidenceUploadTest extends TestCase
         ]);
 
         $group = WorkloadGroup::create([
-            'fiscal_year_id' => $fiscalYear->id,
+            'workload_structure_id' => $this->structureFor($fiscalYear->id)->id,
             'name' => 'กลุ่มทดสอบ',
             'sort_order' => 1,
         ]);
@@ -326,7 +326,7 @@ class WorkRecordEvidenceUploadTest extends TestCase
 
     public function test_step2_displays_earned_score_for_workload_entries(): void
     {
-        $user = User::factory()->create(['role' => UserRole::Staff]);
+        $user = User::factory()->create(['position_id' => $this->defaultPosition()->id, 'role' => UserRole::Staff]);
 
         $fiscalYear = FiscalYear::create(['year' => 2568, 'is_active' => true]);
 
@@ -340,7 +340,7 @@ class WorkRecordEvidenceUploadTest extends TestCase
         ]);
 
         $group = WorkloadGroup::create([
-            'fiscal_year_id' => $fiscalYear->id,
+            'workload_structure_id' => $this->structureFor($fiscalYear->id)->id,
             'name' => 'กลุ่มทดสอบ',
             'max_score' => 100,
             'sort_order' => 1,

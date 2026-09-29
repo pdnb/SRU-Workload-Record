@@ -3,6 +3,7 @@
 namespace Database\Seeders;
 
 use App\Enums\UserRole;
+use App\Models\Position;
 use App\Models\User;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
@@ -121,8 +122,14 @@ class UserSeeder extends Seeder
             ],
         ];
 
+        $defaultPositionId = Position::where('code', PositionSeeder::COMPUTER_OFFICER_CODE)->value('id');
+
         User::unguard();
         foreach ($users as $user) {
+            if ($user['role'] === UserRole::Staff) {
+                $user['position_id'] = $defaultPositionId;
+            }
+
             User::create($user);
         }
         User::reguard();

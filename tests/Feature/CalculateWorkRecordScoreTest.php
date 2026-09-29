@@ -25,7 +25,7 @@ class CalculateWorkRecordScoreTest extends TestCase
 
     private function createRecordWithStructure(array $options = []): WorkRecord
     {
-        $user = User::factory()->create(['role' => UserRole::Staff]);
+        $user = User::factory()->create(['position_id' => $this->defaultPosition()->id, 'role' => UserRole::Staff]);
         $fiscalYear = FiscalYear::create(['year' => 2568, 'is_active' => true]);
 
         $period = EvaluationPeriod::create([
@@ -38,7 +38,7 @@ class CalculateWorkRecordScoreTest extends TestCase
         ]);
 
         $group = WorkloadGroup::create([
-            'fiscal_year_id' => $fiscalYear->id,
+            'workload_structure_id' => $this->structureFor($fiscalYear->id)->id,
             'name' => 'กลุ่มทดสอบ',
             'max_score' => $options['group_max_score'] ?? null,
             'sort_order' => 1,
@@ -143,7 +143,7 @@ class CalculateWorkRecordScoreTest extends TestCase
         $fiscalYearId = $record->evaluationPeriod->fiscal_year_id;
 
         WorkloadGroup::create([
-            'fiscal_year_id' => $fiscalYearId,
+            'workload_structure_id' => $this->structureFor($fiscalYearId)->id,
             'name' => 'กลุ่มที่สอง',
             'max_score' => 60,
             'sort_order' => 2,
@@ -185,7 +185,7 @@ class CalculateWorkRecordScoreTest extends TestCase
 
     public function test_record_list_displays_score_column(): void
     {
-        $user = User::factory()->create(['role' => UserRole::Staff]);
+        $user = User::factory()->create(['position_id' => $this->defaultPosition()->id, 'role' => UserRole::Staff]);
 
         $record = $this->createRecordWithStructure([
             'workload_score' => 10,

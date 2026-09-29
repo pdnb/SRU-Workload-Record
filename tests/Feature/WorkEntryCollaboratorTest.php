@@ -34,9 +34,9 @@ class WorkEntryCollaboratorTest extends TestCase
      */
     private function createCollaboratorContext(): array
     {
-        $owner = User::factory()->create(['role' => UserRole::Staff, 'name' => 'เจ้าของบันทึก']);
-        $collabOne = User::factory()->create(['role' => UserRole::Staff, 'name' => 'ผู้ร่วมหนึ่ง']);
-        $collabTwo = User::factory()->create(['role' => UserRole::Staff, 'name' => 'ผู้ร่วมสอง']);
+        $owner = User::factory()->create(['position_id' => $this->defaultPosition()->id, 'role' => UserRole::Staff, 'name' => 'เจ้าของบันทึก']);
+        $collabOne = User::factory()->create(['position_id' => $this->defaultPosition()->id, 'role' => UserRole::Staff, 'name' => 'ผู้ร่วมหนึ่ง']);
+        $collabTwo = User::factory()->create(['position_id' => $this->defaultPosition()->id, 'role' => UserRole::Staff, 'name' => 'ผู้ร่วมสอง']);
 
         $fiscalYear = FiscalYear::create(['year' => 2568, 'is_active' => true]);
 
@@ -50,7 +50,7 @@ class WorkEntryCollaboratorTest extends TestCase
         ]);
 
         $group = WorkloadGroup::create([
-            'fiscal_year_id' => $fiscalYear->id,
+            'workload_structure_id' => $this->structureFor($fiscalYear->id)->id,
             'name' => 'กลุ่มทดสอบ',
             'sort_order' => 1,
         ]);

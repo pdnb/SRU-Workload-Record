@@ -11,6 +11,7 @@ use App\Models\WorkEntryEvidence;
 use App\Models\WorkRecord;
 use App\Models\WorkloadGroup;
 use App\Models\WorkloadShare;
+use App\Models\WorkloadStructure;
 use App\Support\WorkloadStructureNumbering;
 use Flux\Flux;
 use Illuminate\Support\Facades\Auth;
@@ -149,6 +150,7 @@ new class extends Component
         return User::query()
             ->where('role', UserRole::Staff)
             ->where('id', '!=', Auth::id())
+            ->when($this->structurePositionId, fn ($query, int $positionId) => $query->where('position_id', $positionId))
             ->when($selected !== [], fn ($query) => $query->whereNotIn('id', $selected))
             ->where(fn ($query) => $query
                 ->where('name', 'like', "%{$term}%")
@@ -175,6 +177,7 @@ new class extends Component
             ->join('work_entries as mirror', 'mirror.work_record_id', '=', 'work_records.id')
             ->whereIn('mirror.source_work_entry_id', $ownEntryIds)
             ->where('users.role', UserRole::Staff)
+            ->when($this->structurePositionId, fn ($query, int $positionId) => $query->where('users.position_id', $positionId))
             ->when($selected !== [], fn ($query) => $query->whereNotIn('users.id', $selected))
             ->groupBy('users.id', 'users.name', 'users.department')
             ->orderByDesc('uses')
@@ -249,19 +252,74 @@ new class extends Component
         return EvaluationPeriod::with('fiscalYear')->find($this->selectedPeriodId);
     }
 
+    /**
+     * The record's snapshotted structure, or the one the current user's position
+     * resolves to for the selected period's fiscal year.
+     */
     #[Computed]
-    public function workloadGroups()
+    public function structureId(): ?int
     {
+        if ($this->workRecord?->workload_structure_id) {
+            return $this->workRecord->workload_structure_id;
+        }
+
         $period = $this->selectedPeriod;
 
         if (! $period) {
+            return null;
+        }
+
+        return WorkloadStructure::forUserAndFiscalYear(Auth::user(), $period->fiscal_year_id)?->id;
+    }
+
+    #[Computed]
+    public function structurePositionId(): ?int
+    {
+        return $this->structureId
+            ? WorkloadStructure::whereKey($this->structureId)->value('position_id')
+            : null;
+    }
+
+    #[Computed]
+    public function workloadGroups()
+    {
+        if (! $this->structureId) {
             return collect();
         }
 
-        return WorkloadGroup::query()
-            ->forFiscalYear($period->fiscal_year_id)
+        $groups = WorkloadGroup::query()
+            ->forStructure($this->structureId)
             ->with(['workloadMains.workloads'])
             ->get();
+
+        // Hide items deactivated by an Oracle sync, unless this record already has entries on them.
+        $usedWorkloadIds = array_map('intval', array_keys(array_filter($this->entries)));
+
+        return $groups
+            ->filter(fn (WorkloadGroup $group) => $group->is_active || $group->workloadMains->contains(
+                fn ($main) => $main->workloads->whereIn('id', $usedWorkloadIds)->isNotEmpty(),
+            ))
+            ->each(function (WorkloadGroup $group) use ($usedWorkloadIds) {
+                $group->setRelation('workloadMains', $group->workloadMains
+                    ->each(fn ($main) => $main->setRelation('workloads', $main->workloads
+                        ->filter(fn ($workload) => $workload->is_active || in_array($workload->id, $usedWorkloadIds, true))
+                        ->values()))
+                    ->filter(fn ($main) => $main->is_active || $main->workloads->isNotEmpty())
+                    ->values());
+            })
+            ->values();
+    }
+
+    #[Computed]
+    public function structureMissingMessage(): ?string
+    {
+        if (! $this->selectedPeriodId || $this->structureId) {
+            return null;
+        }
+
+        return Auth::user()->position_id === null
+            ? 'ยังไม่ได้กำหนดตำแหน่งของคุณ กรุณาติดต่อผู้ดูแลระบบ'
+            : 'ยังไม่มีโครงสร้างภาระงานสำหรับตำแหน่งของคุณในปีงบประมาณนี้ กรุณาติดต่อผู้ดูแลระบบ';
     }
 
     #[Computed]
@@ -564,13 +622,19 @@ new class extends Component
 
         $this->selectedPeriodId = $periodId;
         $this->selectedWorkloadId = null;
-        unset($this->selectedPeriod, $this->workloadGroups);
+        unset($this->selectedPeriod, $this->structureId, $this->structurePositionId, $this->structureMissingMessage, $this->workloadGroups);
     }
 
     public function goToStep(int $step): void
     {
         if ($step === 2 && ! $this->selectedPeriodId) {
             Flux::toast('กรุณาเลือกรอบประเมิน', variant: 'danger');
+
+            return;
+        }
+
+        if ($step === 2 && ! $this->structureId) {
+            Flux::toast($this->structureMissingMessage ?? 'ไม่พบโครงสร้างภาระงาน', variant: 'danger');
 
             return;
         }
@@ -735,9 +799,16 @@ new class extends Component
                 $this->workRecord = $existing;
                 $this->loadEntriesFromRecord();
             } else {
+                if (! $this->structureId) {
+                    Flux::toast($this->structureMissingMessage ?? 'ไม่พบโครงสร้างภาระงาน', variant: 'danger');
+
+                    return;
+                }
+
                 $this->workRecord = WorkRecord::create([
                     'user_id' => Auth::id(),
                     'evaluation_period_id' => $this->selectedPeriodId,
+                    'workload_structure_id' => $this->structureId,
                     'status' => WorkRecordStatus::Draft,
                 ]);
             }
@@ -764,6 +835,10 @@ new class extends Component
         }
 
         $this->saveDraft(showToast: false);
+
+        if (! $this->workRecord) {
+            return;
+        }
 
         Gate::authorize('submit', $this->workRecord);
 
@@ -1208,8 +1283,14 @@ new class extends Component
 
         $keptIds = [];
         $skippedCollaborators = [];
+        $mismatchedCollaborators = [];
+        $allowedWorkloadIds = $this->workRecord->workloadStructure?->workloadIds();
 
         foreach ($this->entries as $workloadId => $items) {
+            if ($allowedWorkloadIds !== null && ! in_array((int) $workloadId, $allowedWorkloadIds, true)) {
+                continue;
+            }
+
             foreach ($items as $sortOrder => $data) {
                 if (blank($data['detail'] ?? null)) {
                     continue;
@@ -1243,6 +1324,7 @@ new class extends Component
                             $data['collaborator_ids'] ?? [],
                         );
                         $skippedCollaborators = array_merge($skippedCollaborators, $result['skipped']);
+                        $mismatchedCollaborators = array_merge($mismatchedCollaborators, $result['mismatched'] ?? []);
                     }
                 } else {
                     $entry = $this->workRecord->workEntries()->create($payload);
@@ -1254,6 +1336,7 @@ new class extends Component
                         $data['collaborator_ids'] ?? [],
                     );
                     $skippedCollaborators = array_merge($skippedCollaborators, $result['skipped']);
+                    $mismatchedCollaborators = array_merge($mismatchedCollaborators, $result['mismatched'] ?? []);
                 }
             }
         }
@@ -1272,6 +1355,18 @@ new class extends Component
 
             Flux::toast(
                 "ไม่สามารถบันทึกงานให้: {$names} (ส่งบันทึกแล้ว)",
+                variant: 'warning',
+            );
+        }
+
+        if ($mismatchedCollaborators !== []) {
+            $names = collect($mismatchedCollaborators)
+                ->unique('id')
+                ->pluck('name')
+                ->implode(', ');
+
+            Flux::toast(
+                "ไม่สามารถบันทึกงานให้: {$names} (โครงสร้างภาระงานต่างตำแหน่ง)",
                 variant: 'warning',
             );
         }
@@ -1559,9 +1654,15 @@ new class extends Component
             @endforelse
         </div>
 
+        @if ($selectedPeriodId && ! $readOnly && $this->structureMissingMessage)
+            <flux:callout class="mt-6" variant="warning" icon="exclamation-triangle">
+                {{ $this->structureMissingMessage }}
+            </flux:callout>
+        @endif
+
         @if ($selectedPeriodId && ! $readOnly)
             <div class="mt-6 flex justify-end">
-                <flux:button wire:click="goToStep(2)" variant="primary">ถัดไป</flux:button>
+                <flux:button wire:click="goToStep(2)" variant="primary" :disabled="! $this->structureId">ถัดไป</flux:button>
             </div>
         @endif
     @endif

@@ -31,7 +31,7 @@ class EvidencePreviewTest extends TestCase
     {
         Storage::fake('public');
 
-        $user = User::factory()->create(['role' => UserRole::Staff]);
+        $user = User::factory()->create(['position_id' => $this->defaultPosition()->id, 'role' => UserRole::Staff]);
         $fiscalYear = FiscalYear::create(['year' => 2568, 'is_active' => true]);
 
         $period = EvaluationPeriod::create([
@@ -44,7 +44,7 @@ class EvidencePreviewTest extends TestCase
         ]);
 
         $group = WorkloadGroup::create([
-            'fiscal_year_id' => $fiscalYear->id,
+            'workload_structure_id' => $this->structureFor($fiscalYear->id)->id,
             'name' => 'กลุ่มทดสอบ',
             'sort_order' => 1,
         ]);
@@ -102,7 +102,7 @@ class EvidencePreviewTest extends TestCase
     {
         ['evidence' => $evidence] = $this->createFileEvidence();
 
-        $otherUser = User::factory()->create(['role' => UserRole::Staff]);
+        $otherUser = User::factory()->create(['position_id' => $this->defaultPosition()->id, 'role' => UserRole::Staff]);
 
         $this->actingAs($otherUser)->get(route('staff.evidence.preview', $evidence))->assertForbidden();
     }

@@ -1,6 +1,7 @@
 <?php
 
 use Illuminate\Support\Str;
+use Pdo\Mysql;
 
 return [
 
@@ -58,7 +59,9 @@ return [
             'strict' => true,
             'engine' => null,
             'options' => extension_loaded('pdo_mysql') ? array_filter([
-                PDO::MYSQL_ATTR_SSL_CA => env('MYSQL_ATTR_SSL_CA'),
+                (defined('Pdo\\Mysql::ATTR_SSL_CA')
+                    ? Mysql::ATTR_SSL_CA
+                    : PDO::MYSQL_ATTR_SSL_CA) => env('MYSQL_ATTR_SSL_CA'),
             ]) : [],
         ],
 
@@ -78,7 +81,9 @@ return [
             'strict' => true,
             'engine' => null,
             'options' => extension_loaded('pdo_mysql') ? array_filter([
-                PDO::MYSQL_ATTR_SSL_CA => env('MYSQL_ATTR_SSL_CA'),
+                (defined('Pdo\\Mysql::ATTR_SSL_CA')
+                    ? Mysql::ATTR_SSL_CA
+                    : PDO::MYSQL_ATTR_SSL_CA) => env('MYSQL_ATTR_SSL_CA'),
             ]) : [],
         ],
 
@@ -110,6 +115,27 @@ return [
             'prefix_indexes' => true,
             // 'encrypt' => env('DB_ENCRYPT', 'yes'),
             // 'trust_server_certificate' => env('DB_TRUST_SERVER_CERTIFICATE', 'false'),
+        ],
+
+        // Read-only source of positions and workload structures (yajra/laravel-oci8).
+        // Only used via DB::connection('oracle'); see config/oracle_workload.php.
+        'oracle' => [
+            'driver' => 'oracle',
+            'tns' => env('DB_ORACLE_TNS', ''),
+            'host' => env('DB_ORACLE_HOST', ''),
+            'port' => env('DB_ORACLE_PORT', '1521'),
+            'database' => env('DB_ORACLE_DATABASE', ''),
+            'service_name' => env('DB_ORACLE_SERVICE_NAME', ''),
+            'username' => env('DB_ORACLE_USERNAME', ''),
+            'password' => env('DB_ORACLE_PASSWORD', ''),
+            'charset' => env('DB_ORACLE_CHARSET', 'AL32UTF8'),
+            'prefix' => '',
+            'prefix_schema' => env('DB_ORACLE_SCHEMA', ''),
+            'edition' => env('DB_ORACLE_EDITION', 'ora$base'),
+            'server_version' => env('DB_ORACLE_SERVER_VERSION', '11g'),
+            'load_balance' => 'yes',
+            'max_name_len' => 30,
+            'dynamic' => [],
         ],
 
     ],

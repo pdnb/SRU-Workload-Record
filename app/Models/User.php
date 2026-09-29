@@ -2,8 +2,11 @@
 
 namespace App\Models;
 
+use App\Enums\PositionSource;
 use App\Enums\UserRole;
+use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
@@ -11,7 +14,7 @@ use Illuminate\Support\Str;
 
 class User extends Authenticatable
 {
-    /** @use HasFactory<\Database\Factories\UserFactory> */
+    /** @use HasFactory<UserFactory> */
     use HasFactory, Notifiable;
 
     protected $fillable = [
@@ -19,7 +22,11 @@ class User extends Authenticatable
         'email',
         'password',
         'oauth_sub',
+        'external_id',
         'position',
+        'position_id',
+        'position_source',
+        'position_synced_at',
         'department',
         'faculty',
         'role',
@@ -36,7 +43,17 @@ class User extends Authenticatable
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
             'role' => UserRole::class,
+            'position_source' => PositionSource::class,
+            'position_synced_at' => 'datetime',
         ];
+    }
+
+    /**
+     * Named assignedPosition because the legacy free-text `position` column still exists.
+     */
+    public function assignedPosition(): BelongsTo
+    {
+        return $this->belongsTo(Position::class, 'position_id');
     }
 
     public function workRecords(): HasMany

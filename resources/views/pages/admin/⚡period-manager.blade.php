@@ -315,10 +315,10 @@ new class extends Component
             <flux:heading size="lg">{{ $editingPeriodId ? 'แก้ไขรอบประเมิน' : 'เพิ่มรอบประเมิน' }}</flux:heading>
             <flux:field>
                 <flux:label>รอบที่</flux:label>
-                <flux:select wire:model="periodNumber">
+                <x-searchable-select wire:model="periodNumber">
                     <option value="1">รอบที่ 1</option>
                     <option value="2">รอบที่ 2</option>
-                </flux:select>
+                </x-searchable-select>
                 <flux:error name="periodNumber" />
             </flux:field>
             <flux:field>
@@ -340,11 +340,11 @@ new class extends Component
             </div>
             <flux:field>
                 <flux:label>สถานะ</flux:label>
-                <flux:select wire:model="periodStatus">
+                <x-searchable-select wire:model="periodStatus">
                     <option value="draft">ร่าง</option>
                     <option value="open">เปิดรับ</option>
                     <option value="closed">ปิดแล้ว</option>
-                </flux:select>
+                </x-searchable-select>
                 <flux:error name="periodStatus" />
             </flux:field>
             <div class="flex justify-end gap-2">

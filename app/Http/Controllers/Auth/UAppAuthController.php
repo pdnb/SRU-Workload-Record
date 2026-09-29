@@ -2,11 +2,13 @@
 
 namespace App\Http\Controllers\Auth;
 
+use App\Actions\Oracle\SyncStaffPositions;
 use App\Http\Controllers\Controller;
 use App\Models\User;
 use App\Support\PostLoginRedirect;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Session;
 use Illuminate\Support\Str;
 use Laravel\Socialite\Facades\Socialite;
@@ -43,10 +45,29 @@ class UAppAuthController extends Controller
 
         $user->refresh();
 
+        $this->syncPositionFromOracle($user);
+
         Auth::login($user, remember: true);
         Session::regenerate();
 
         return redirect()->intended(PostLoginRedirect::routeFor($user));
+    }
+
+    /**
+     * First login: pull the user's position from Oracle so they can record work
+     * right away. Never blocks login — failures are only logged.
+     */
+    protected function syncPositionFromOracle(User $user): void
+    {
+        if (! config('oracle_workload.enabled') || $user->position_id !== null) {
+            return;
+        }
+
+        try {
+            app(SyncStaffPositions::class)->forUser($user);
+        } catch (Throwable $e) {
+            Log::warning('Oracle position sync on login failed.', ['user' => $user->id, 'error' => $e->getMessage()]);
+        }
     }
 
     protected function redirectWithError(string $message): RedirectResponse

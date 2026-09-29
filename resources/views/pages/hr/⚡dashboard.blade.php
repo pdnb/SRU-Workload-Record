@@ -135,31 +135,31 @@ new class extends Component
     <div class="mb-8 grid gap-4 sm:grid-cols-3">
         <flux:field>
             <flux:label>ปีงบประมาณ</flux:label>
-            <flux:select wire:model.live="filterFiscalYearId">
+            <x-searchable-select wire:model.live="filterFiscalYearId">
                 @foreach ($this->fiscalYears as $fy)
                     <option wire:key="fy-opt-{{ $fy->id }}" value="{{ $fy->id }}">{{ $fy->year }}</option>
                 @endforeach
-            </flux:select>
+            </x-searchable-select>
         </flux:field>
 
         <flux:field>
             <flux:label>รอบประเมิน</flux:label>
-            <flux:select wire:model.live="filterPeriodId">
+            <x-searchable-select wire:model.live="filterPeriodId">
                 <option value="">ทั้งหมด</option>
                 @foreach ($this->periods as $period)
                     <option wire:key="period-opt-{{ $period->id }}" value="{{ $period->id }}">{{ $period->label }}</option>
                 @endforeach
-            </flux:select>
+            </x-searchable-select>
         </flux:field>
 
         <flux:field>
             <flux:label>หน่วยงาน</flux:label>
-            <flux:select wire:model.live="filterDepartment">
+            <x-searchable-select wire:model.live="filterDepartment">
                 <option value="">ทั้งหมด</option>
                 @foreach ($this->departments as $department)
                     <option wire:key="dept-opt-{{ $loop->index }}" value="{{ $department }}">{{ $department }}</option>
                 @endforeach
-            </flux:select>
+            </x-searchable-select>
         </flux:field>
     </div>
 

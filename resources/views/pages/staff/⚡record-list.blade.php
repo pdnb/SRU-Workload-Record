@@ -37,9 +37,9 @@ new class extends Component
             <flux:heading size="lg" class="mb-4">ปีงบประมาณ {{ $year }}</flux:heading>
 
             <div class="overflow-hidden rounded-xl border border-zinc-200 bg-white dark:border-zinc-700 dark:bg-zinc-800">
-                <table class="w-full">
-                    <thead class="hidden lg:table-header-group">
-                        <tr class="divide-y divide-zinc-200 bg-zinc-50 dark:divide-zinc-700 dark:bg-zinc-900">
+                <table class="w-full divide-y divide-zinc-200 dark:divide-zinc-700">
+                    <thead class="hidden bg-zinc-50 lg:table-header-group dark:bg-zinc-900">
+                        <tr>
                             <th class="px-4 py-3 text-left text-sm font-medium text-zinc-600 dark:text-zinc-400">รอบประเมิน</th>
                             <th class="px-4 py-3 text-left text-sm font-medium text-zinc-600 dark:text-zinc-400">สถานะ</th>
                             <th class="px-4 py-3 text-left text-sm font-medium text-zinc-600 dark:text-zinc-400">ผลงาน</th>

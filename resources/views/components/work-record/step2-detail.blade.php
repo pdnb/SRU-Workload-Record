@@ -81,33 +81,57 @@
 
                     <div class="mt-3 flex flex-wrap gap-2">
                         @if ($shareEnabled && $shareUrl)
-                            <flux:button
-                                type="button"
-                                variant="filled"
-                                size="sm"
-                                icon="link"
-                                x-on:click="navigator.clipboard.writeText(@js($shareUrl)); $wire.notifyShareLinkCopied()"
+                            <div
+                                class="contents"
+                                x-data="{
+                                    shareUrl: @js($shareUrl),
+                                    copyShareUrl() {
+                                        if (navigator.clipboard && window.isSecureContext) {
+                                            navigator.clipboard.writeText(this.shareUrl).then(() => $wire.notifyShareLinkCopied());
+                                            return;
+                                        }
+
+                                        const input = document.createElement('textarea');
+                                        input.value = this.shareUrl;
+                                        input.style.position = 'fixed';
+                                        input.style.opacity = '0';
+                                        document.body.appendChild(input);
+                                        input.focus();
+                                        input.select();
+                                        document.execCommand('copy');
+                                        document.body.removeChild(input);
+                                        $wire.notifyShareLinkCopied();
+                                    },
+                                }"
                             >
-                                คัดลอกลิงก์
-                            </flux:button>
-                            <flux:button
-                                :href="$shareUrl"
-                                variant="ghost"
-                                size="sm"
-                                icon="arrow-top-right-on-square"
-                                target="_blank"
-                            >
-                                ดูตัวอย่าง
-                            </flux:button>
-                            <flux:button
-                                wire:click="disableWorkloadShare"
-                                variant="ghost"
-                                size="sm"
-                                icon="x-mark"
-                                wire:loading.attr="disabled"
-                            >
-                                ปิดการแชร์
-                            </flux:button>
+                                <flux:button
+                                    type="button"
+                                    variant="filled"
+                                    size="sm"
+                                    icon="link"
+                                    x-on:click="copyShareUrl()"
+                                >
+                                    คัดลอกลิงก์
+                                </flux:button>
+                                <flux:button
+                                    :href="$shareUrl"
+                                    variant="ghost"
+                                    size="sm"
+                                    icon="arrow-top-right-on-square"
+                                    target="_blank"
+                                >
+                                    ดูตัวอย่าง
+                                </flux:button>
+                                <flux:button
+                                    wire:click="disableWorkloadShare"
+                                    variant="ghost"
+                                    size="sm"
+                                    icon="x-mark"
+                                    wire:loading.attr="disabled"
+                                >
+                                    ปิดการแชร์
+                                </flux:button>
+                            </div>
                         @else
                             <flux:button
                                 wire:click="enableWorkloadShare"

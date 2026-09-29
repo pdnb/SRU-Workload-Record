@@ -292,4 +292,25 @@ class WorkloadShareTest extends TestCase
         $this->assertNotEquals($oldToken, $share->token);
         $this->get(route('share.workload.show', $share->token))->assertOk();
     }
+
+    public function test_copy_share_button_renders_a_valid_alpine_expression(): void
+    {
+        $data = $this->createSubmittedRecordWithEvidence();
+
+        WorkloadShare::create([
+            'work_record_id' => $data['record']->id,
+            'workload_id' => $data['workload']->id,
+            'token' => (string) str()->uuid(),
+            'enabled_at' => now(),
+        ]);
+
+        $html = Livewire::actingAs($data['owner'])
+            ->test('pages::staff.work-record-form', ['record' => $data['record']])
+            ->set('step', 2)
+            ->set('selectedWorkloadId', $data['workload']->id)
+            ->html();
+
+        $this->assertStringNotContainsString('@js(', $html);
+        $this->assertStringContainsString('navigator.clipboard.writeText(shareUrl)', $html);
+    }
 }

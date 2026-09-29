@@ -14,6 +14,7 @@
 
 @php
     use App\Models\WorkEntryEvidence;
+    use Illuminate\Support\Facades\Storage;
 
     $evidenceFiles = ($modalEntry['evidence_type'] ?? 'url') === 'file'
         ? array_values(array_filter(
@@ -78,6 +79,20 @@
                             </li>
                         @endforeach
                     </ul>
+                @elseif ($this->frequentCollaborators->isNotEmpty())
+                    <div class="mb-3 flex flex-wrap items-center gap-2">
+                        <span class="text-xs text-zinc-500">ใช้บ่อย:</span>
+                        @foreach ($this->frequentCollaborators as $user)
+                            <button
+                                type="button"
+                                wire:key="collab-frequent-{{ $user->id }}"
+                                wire:click="addCollaborator({{ $user->id }})"
+                                class="rounded-full border border-zinc-200 px-2.5 py-0.5 text-xs text-zinc-700 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
+                            >
+                                + {{ $user->name }}
+                            </button>
+                        @endforeach
+                    </div>
                 @endif
             @endunless
 
@@ -244,9 +259,11 @@
                             $evidenceId = $file['id'] ?? null;
                             $filePath = $file['path'] ?? '';
                             $fileName = $file['filename'] ?? basename($filePath);
-                            $previewUrl = filled($evidenceId) && WorkEntryEvidence::isPathPreviewable($filePath)
-                                ? route('staff.evidence.preview', ['evidence' => $evidenceId])
-                                : null;
+                            $previewUrl = match (true) {
+                                ! WorkEntryEvidence::isPathPreviewable($filePath) => null,
+                                filled($evidenceId) => route('staff.evidence.preview', ['evidence' => $evidenceId]),
+                                default => Storage::disk('public')->url($filePath),
+                            };
                         @endphp
                         <x-work-entry-evidence-item
                             :filename="$fileName"

@@ -108,6 +108,23 @@ class WorkRecordEvidenceUploadTest extends TestCase
         }
     }
 
+    public function test_pending_image_upload_shows_thumbnail_preview(): void
+    {
+        Storage::fake('public');
+
+        ['user' => $user, 'period' => $period, 'workloadA' => $workload] = $this->createWorkRecordContext();
+
+        Livewire::actingAs($user)
+            ->test('pages::staff.work-record-form')
+            ->set('selectedPeriodId', $period->id)
+            ->set('step', 2)
+            ->call('openEntryModal', $workload->id)
+            ->call('setEvidenceType', 'file')
+            ->set('evidenceUploads', [UploadedFile::fake()->image('photo.jpg')])
+            ->assertSeeHtml('<img')
+            ->assertSeeHtml('/storage/work-evidence/');
+    }
+
     public function test_saving_one_entry_does_not_delete_file_evidence_from_other_entries(): void
     {
         Storage::fake('public');

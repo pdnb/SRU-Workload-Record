@@ -4,7 +4,12 @@
     'selectedWorkloadId' => null,
     'filteredWorkloadTree' => null,
     'structureNumbers' => ['groups' => [], 'mains' => [], 'workloads' => []],
+    'categoryTotals' => ['groups' => [], 'mains' => []],
 ])
+
+@php
+    $formatScore = fn (?array $totals): string => rtrim(rtrim(number_format($totals['score'] ?? 0, 2), '0'), '.');
+@endphp
 
 <div
     {{ $attributes->class(['flex flex-col rounded-xl border border-zinc-200 bg-white dark:border-zinc-700 dark:bg-zinc-800']) }}
@@ -67,6 +72,14 @@
                     <span x-bind:class="isGroupOpen({{ $group->id }}) ? 'rotate-90' : ''" class="text-zinc-400 transition-transform">›</span>
                     <span class="shrink-0 tabular-nums text-zinc-400">{{ $structureNumbers['groups'][$group->id] ?? '' }}.</span>
                     <span class="min-w-0 flex-1 truncate">{{ $group->name }}</span>
+                    @php
+                        $groupTotals = $categoryTotals['groups'][$group->id] ?? null;
+                        $groupCount = $groupTotals['entry_count'] ?? 0;
+                    @endphp
+                    <span class="flex shrink-0 items-center gap-1">
+                        <flux:badge size="sm" :color="$groupCount > 0 ? 'blue' : 'zinc'" title="จำนวนชิ้นงาน" aria-label="จำนวนชิ้นงาน {{ $groupCount }}">{{ $groupCount }} ชิ้น</flux:badge>
+                        <flux:badge size="sm" :color="($groupTotals['score'] ?? 0) > 0 ? 'green' : 'zinc'" title="คะแนน" aria-label="คะแนน {{ $formatScore($groupTotals) }}">{{ $formatScore($groupTotals) }} คะแนน</flux:badge>
+                    </span>
                 </button>
 
                 <div x-show="isGroupOpen({{ $group->id }})" x-cloak class="pl-2">
@@ -83,6 +96,14 @@
                                 <span x-bind:class="isMainOpen({{ $main->id }}) ? 'rotate-90' : ''" class="text-zinc-400 transition-transform">›</span>
                                 <span class="shrink-0 tabular-nums text-zinc-400">{{ $structureNumbers['mains'][$main->id] ?? '' }}</span>
                                 <span class="min-w-0 flex-1 truncate">{{ $main->name }}</span>
+                                @php
+                                    $mainTotals = $categoryTotals['mains'][$main->id] ?? null;
+                                    $mainCount = $mainTotals['entry_count'] ?? 0;
+                                @endphp
+                                <span class="flex shrink-0 items-center gap-1">
+                                    <flux:badge size="sm" :color="$mainCount > 0 ? 'blue' : 'zinc'" title="จำนวนชิ้นงาน" aria-label="จำนวนชิ้นงาน {{ $mainCount }}">{{ $mainCount }} ชิ้น</flux:badge>
+                                    <flux:badge size="sm" :color="($mainTotals['score'] ?? 0) > 0 ? 'green' : 'zinc'" title="คะแนน" aria-label="คะแนน {{ $formatScore($mainTotals) }}">{{ $formatScore($mainTotals) }} คะแนน</flux:badge>
+                                </span>
                             </button>
 
                             <div x-show="isMainOpen({{ $main->id }})" x-cloak class="space-y-0.5 pl-3">

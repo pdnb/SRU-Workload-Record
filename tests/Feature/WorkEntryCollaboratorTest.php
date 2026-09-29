@@ -115,6 +115,47 @@ class WorkEntryCollaboratorTest extends TestCase
         }
     }
 
+    public function test_frequent_collaborators_are_ranked_by_usage_and_exclude_selected(): void
+    {
+        [
+            'owner' => $owner,
+            'collabOne' => $collabOne,
+            'collabTwo' => $collabTwo,
+            'period' => $period,
+            'workload' => $workload,
+        ] = $this->createCollaboratorContext();
+
+        $component = Livewire::actingAs($owner)
+            ->test('pages::staff.work-record-form')
+            ->set('selectedPeriodId', $period->id)
+            ->set('step', 2);
+
+        foreach ([[$collabOne->id, $collabTwo->id], [$collabTwo->id]] as $ids) {
+            $component
+                ->call('openEntryModal', $workload->id)
+                ->set('modalEntry.detail', 'รายละเอียดผลงานร่วมกันทดสอบรายชื่อที่ใช้บ่อย')
+                ->set('modalEntry.collaborator_ids', $ids)
+                ->call('saveModalEntry')
+                ->assertHasNoErrors();
+        }
+
+        $component->call('openEntryModal', $workload->id);
+
+        $this->assertSame(
+            [$collabTwo->id, $collabOne->id],
+            $component->instance()->frequentCollaborators->pluck('id')->all(),
+        );
+
+        $component
+            ->assertSee('ใช้บ่อย:')
+            ->call('addCollaborator', $collabTwo->id);
+
+        $this->assertSame(
+            [$collabOne->id],
+            $component->instance()->frequentCollaborators->pluck('id')->all(),
+        );
+    }
+
     public function test_collaborator_score_includes_mirrored_entry(): void
     {
         [

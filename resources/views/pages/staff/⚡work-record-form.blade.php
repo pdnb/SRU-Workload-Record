@@ -159,6 +159,31 @@ new class extends Component
     }
 
     #[Computed]
+    public function frequentCollaborators()
+    {
+        $selected = $this->modalEntry['collaborator_ids'] ?? [];
+
+        $ownEntryIds = WorkEntry::query()
+            ->select('work_entries.id')
+            ->join('work_records as own', 'own.id', '=', 'work_entries.work_record_id')
+            ->where('own.user_id', Auth::id());
+
+        return User::query()
+            ->select('users.id', 'users.name', 'users.department')
+            ->selectRaw('COUNT(*) as uses')
+            ->join('work_records', 'work_records.user_id', '=', 'users.id')
+            ->join('work_entries as mirror', 'mirror.work_record_id', '=', 'work_records.id')
+            ->whereIn('mirror.source_work_entry_id', $ownEntryIds)
+            ->where('users.role', UserRole::Staff)
+            ->when($selected !== [], fn ($query) => $query->whereNotIn('users.id', $selected))
+            ->groupBy('users.id', 'users.name', 'users.department')
+            ->orderByDesc('uses')
+            ->orderBy('users.name')
+            ->limit(6)
+            ->get();
+    }
+
+    #[Computed]
     public function modalCollaborators()
     {
         $ids = $this->modalEntry['collaborator_ids'] ?? [];
@@ -187,7 +212,7 @@ new class extends Component
 
         $this->modalEntry['collaborator_ids'] = $ids;
         $this->collaboratorSearch = '';
-        unset($this->collaboratorSearchResults, $this->modalCollaborators);
+        unset($this->collaboratorSearchResults, $this->modalCollaborators, $this->frequentCollaborators);
     }
 
     public function removeCollaborator(int $userId): void
@@ -201,7 +226,7 @@ new class extends Component
             fn ($id) => (int) $id !== $userId,
         ));
 
-        unset($this->modalCollaborators, $this->collaboratorSearchResults);
+        unset($this->modalCollaborators, $this->collaboratorSearchResults, $this->frequentCollaborators);
     }
 
     #[Computed]
@@ -364,6 +389,41 @@ new class extends Component
         }
 
         return $tree;
+    }
+
+    #[Computed]
+    public function categoryTotals(): array
+    {
+        $mains = [];
+
+        foreach ($this->flatWorkloads->groupBy('main_id') as $mainId => $items) {
+            $total = (float) $items->sum('earned_score');
+            $max = $items->first()['main_max_score'] ?? null;
+
+            $mains[$mainId] = [
+                'entry_count' => (int) $items->sum('entry_count'),
+                'score' => $max !== null ? min($total, (float) $max) : $total,
+                'max_score' => $max !== null ? (float) $max : null,
+            ];
+        }
+
+        $groups = [];
+
+        foreach ($this->flatWorkloads->groupBy('group_id') as $groupId => $items) {
+            $total = (float) $items
+                ->pluck('main_id')
+                ->unique()
+                ->sum(fn (int $mainId) => $mains[$mainId]['score'] ?? 0.0);
+            $max = $items->first()['group_max_score'] ?? null;
+
+            $groups[$groupId] = [
+                'entry_count' => (int) $items->sum('entry_count'),
+                'score' => $max !== null ? min($total, (float) $max) : $total,
+                'max_score' => $max !== null ? (float) $max : null,
+            ];
+        }
+
+        return ['groups' => $groups, 'mains' => $mains];
     }
 
     #[Computed]
@@ -1526,6 +1586,7 @@ new class extends Component
                 :selected-workload-id="$selectedWorkloadId"
                 :filtered-workload-tree="$this->filteredWorkloadTree"
                 :structure-numbers="$this->structureNumbers"
+                :category-totals="$this->categoryTotals"
                 class="sticky top-36 hidden max-h-[calc(100vh-10rem)] lg:flex"
             />
 
@@ -1549,6 +1610,7 @@ new class extends Component
                     :selected-workload-id="$selectedWorkloadId"
                     :filtered-workload-tree="$this->filteredWorkloadTree"
                     :structure-numbers="$this->structureNumbers"
+                    :category-totals="$this->categoryTotals"
                     class="border-none"
                 />
             </div>

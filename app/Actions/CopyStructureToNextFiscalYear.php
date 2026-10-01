@@ -43,9 +43,11 @@ class CopyStructureToNextFiscalYear
             $source->load(['evaluationPeriods', 'workloadStructures.workloadGroups.workloadMains.workloads']);
 
             foreach ($source->evaluationPeriods as $period) {
-                EvaluationPeriod::create([
+                // The target year may already have periods set up (e.g. created manually) without any groups.
+                EvaluationPeriod::firstOrCreate([
                     'fiscal_year_id' => $target->id,
                     'period' => $period->period,
+                ], [
                     'label' => str_replace((string) $source->year, (string) $targetYear, $period->label),
                     'start_date' => $period->start_date->addYear(),
                     'end_date' => $period->end_date->addYear(),

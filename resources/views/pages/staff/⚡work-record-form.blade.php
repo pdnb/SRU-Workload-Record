@@ -1085,11 +1085,25 @@ new class extends Component
             return;
         }
 
+        $this->validate(['evidenceUploads.*' => $this->evidenceUploadRules()]);
+
         if (! $this->workRecord && $this->selectedPeriodId) {
             $this->saveDraft(showToast: false);
         }
 
         $this->persistPendingEvidenceUploads();
+    }
+
+    /**
+     * @return list<string>
+     */
+    protected function evidenceUploadRules(): array
+    {
+        return [
+            'file',
+            'max:10240',
+            'mimes:pdf,doc,docx,xls,xlsx,jpg,jpeg,png,webp',
+        ];
     }
 
     protected function persistPendingEvidenceUploads(): void
@@ -1141,11 +1155,7 @@ new class extends Component
                 && $this->modalEvidenceFiles() !== [];
 
             $rules['evidenceUploads'] = [$hasExistingFiles || $this->evidenceUploads !== [] ? 'nullable' : 'required', 'array'];
-            $rules['evidenceUploads.*'] = [
-                'file',
-                'max:10240',
-                'mimes:pdf,doc,docx,xls,xlsx,jpg,jpeg,png,webp',
-            ];
+            $rules['evidenceUploads.*'] = $this->evidenceUploadRules();
         }
 
         $this->validate($rules);

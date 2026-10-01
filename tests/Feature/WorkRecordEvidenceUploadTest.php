@@ -225,6 +225,66 @@ class WorkRecordEvidenceUploadTest extends TestCase
         $this->assertSame('entry-two.pdf', $secondEntry->fileEvidences->first()->filename);
     }
 
+    public function test_pasted_screenshot_png_is_stored_as_evidence(): void
+    {
+        Storage::fake('public');
+
+        ['user' => $user, 'period' => $period, 'workloadA' => $workload] = $this->createWorkRecordContext();
+
+        Livewire::actingAs($user)
+            ->test('pages::staff.work-record-form')
+            ->set('selectedPeriodId', $period->id)
+            ->set('step', 2)
+            ->call('openEntryModal', $workload->id)
+            ->call('setEvidenceType', 'file')
+            ->set('modalEntry.detail', 'รายละเอียดผลงานทดสอบการแนบภาพหน้าจอเป็นหลักฐาน')
+            ->set('evidenceUploads', [UploadedFile::fake()->image('screenshot-20261001-101500.png')])
+            ->assertHasNoErrors()
+            ->call('saveModalEntry')
+            ->assertHasNoErrors();
+
+        $record = $user->workRecords()->first();
+        $evidence = $record->workEntries()->with('fileEvidences')->first()->fileEvidences->sole();
+
+        $this->assertSame('screenshot-20261001-101500.png', $evidence->filename);
+        $this->assertStringStartsWith('work-evidence/'.$record->id.'/', $evidence->value);
+        Storage::disk('public')->assertExists($evidence->value);
+    }
+
+    public function test_rejects_disallowed_file_type_on_upload(): void
+    {
+        Storage::fake('public');
+
+        ['user' => $user, 'period' => $period, 'workloadA' => $workload] = $this->createWorkRecordContext();
+
+        Livewire::actingAs($user)
+            ->test('pages::staff.work-record-form')
+            ->set('selectedPeriodId', $period->id)
+            ->set('step', 2)
+            ->call('openEntryModal', $workload->id)
+            ->call('setEvidenceType', 'file')
+            ->set('evidenceUploads', [UploadedFile::fake()->create('malware.exe', 10, 'application/x-msdownload')])
+            ->assertHasErrors('evidenceUploads.0')
+            ->assertSet('modalEntry.evidence_files', []);
+
+        $this->assertSame([], Storage::disk('public')->allFiles('work-evidence'));
+    }
+
+    public function test_file_mode_renders_capture_and_paste_buttons(): void
+    {
+        ['user' => $user, 'period' => $period, 'workloadA' => $workload] = $this->createWorkRecordContext();
+
+        Livewire::actingAs($user)
+            ->test('pages::staff.work-record-form')
+            ->set('selectedPeriodId', $period->id)
+            ->set('step', 2)
+            ->call('openEntryModal', $workload->id)
+            ->call('setEvidenceType', 'file')
+            ->assertSee('จับภาพหน้าจอ')
+            ->assertSee('วางภาพจากคลิปบอร์ด')
+            ->assertSeeHtml('x-data="evidenceCapture"');
+    }
+
     public function test_multiple_upload_batches_before_save_keeps_all_files(): void
     {
         Storage::fake('public');

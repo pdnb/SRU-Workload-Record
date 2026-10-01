@@ -187,21 +187,8 @@
         @else
             <div wire:key="evidence-file">
             <div
-                x-data="{
-                    dragging: false,
-                    openFilePicker() { this.$refs.fileInput.click(); },
-                    handleDrop(e) {
-                        e.preventDefault();
-                        this.dragging = false;
-                        const input = this.$refs.fileInput;
-                        const dt = new DataTransfer();
-                        for (const file of e.dataTransfer.files) {
-                            dt.items.add(file);
-                        }
-                        input.files = dt.files;
-                        input.dispatchEvent(new Event('change', { bubbles: true }));
-                    },
-                }"
+                x-data="evidenceCapture"
+                @paste.window="onPaste($event)"
                 class="relative"
             >
                 <input
@@ -228,7 +215,65 @@
                 >
                     <flux:icon.cloud-arrow-up class="mb-2 size-8 text-zinc-400 dark:text-zinc-500" />
                     <p class="text-sm text-zinc-600 dark:text-zinc-400">ลากไฟล์มาวางหรือคลิกเพื่อเลือกไฟล์</p>
+                    <p class="mt-1 text-xs text-zinc-400 dark:text-zinc-500">หรือกด Ctrl+V เพื่อวางภาพจาก Snipping Tool (Win+Shift+S)</p>
                 </div>
+
+                <div class="mt-2 flex flex-wrap items-center gap-2">
+                    <flux:button
+                        type="button"
+                        size="sm"
+                        variant="ghost"
+                        icon="camera"
+                        x-show="canCapture"
+                        x-bind:disabled="capturing"
+                        @click="startCapture()"
+                    >
+                        จับภาพหน้าจอ
+                    </flux:button>
+                    <flux:button
+                        type="button"
+                        size="sm"
+                        variant="ghost"
+                        icon="clipboard-document"
+                        @click="pasteFromClipboard()"
+                    >
+                        วางภาพจากคลิปบอร์ด
+                    </flux:button>
+                </div>
+                <p x-show="hint" x-text="hint" x-cloak class="mt-1 text-xs text-amber-600 dark:text-amber-400"></p>
+
+                <dialog
+                    x-ref="cropDialog"
+                    @cancel.prevent="cancelCrop()"
+                    class="m-auto max-h-[95vh] max-w-[95vw] rounded-xl bg-white p-4 shadow-xl backdrop:bg-black/60 dark:bg-zinc-900"
+                >
+                    <template x-if="cropping">
+                        <div class="flex flex-col gap-3">
+                            <div>
+                                <p class="text-sm font-medium text-zinc-800 dark:text-zinc-100">เลือกพื้นที่ที่ต้องการแนบ</p>
+                                <p class="text-xs text-zinc-500 dark:text-zinc-400">ลากเมาส์เพื่อครอปภาพ หากไม่เลือกจะแนบทั้งภาพ</p>
+                            </div>
+                            <div
+                                x-ref="cropArea"
+                                class="relative inline-block cursor-crosshair overflow-hidden touch-none select-none self-center"
+                                @pointerdown="beginSelect($event)"
+                                @pointermove="moveSelect($event)"
+                                @pointerup="endSelect()"
+                                @pointercancel="endSelect()"
+                            >
+                                <img :src="snapshotUrl" alt="ภาพหน้าจอที่จับได้" draggable="false" class="block max-h-[70vh] max-w-full" />
+                                <div
+                                    class="pointer-events-none absolute border-2 border-sky-500 bg-sky-500/10 shadow-[0_0_0_9999px_rgba(0,0,0,0.45)]"
+                                    :style="selectionStyle()"
+                                ></div>
+                            </div>
+                            <div class="flex justify-end gap-2">
+                                <flux:button type="button" size="sm" variant="ghost" @click="cancelCrop()">ยกเลิก</flux:button>
+                                <flux:button type="button" size="sm" variant="primary" icon="check" @click="confirmCrop()">ใช้ภาพนี้</flux:button>
+                            </div>
+                        </div>
+                    </template>
+                </dialog>
             </div>
             <flux:error name="evidenceUploads" />
             <flux:error name="evidenceUploads.*" />

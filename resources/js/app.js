@@ -1,6 +1,11 @@
 import Chart from 'chart.js/auto';
+import evidenceCapture from './evidence-capture';
 
 window.Chart = Chart;
+
+document.addEventListener('alpine:init', () => {
+    window.Alpine.data('evidenceCapture', evidenceCapture);
+});
 
 window.copyText = (text) => {
     if (navigator.clipboard && window.isSecureContext) {

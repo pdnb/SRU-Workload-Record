@@ -232,6 +232,7 @@ new class extends Component
                     <th class="px-4 py-3 text-left text-sm font-medium text-zinc-600 dark:text-zinc-400">บทบาท</th>
                     <th class="px-4 py-3 text-left text-sm font-medium text-zinc-600 dark:text-zinc-400">ตำแหน่ง</th>
                     <th class="px-4 py-3 text-left text-sm font-medium text-zinc-600 dark:text-zinc-400">ที่มา</th>
+                    <th class="px-4 py-3 text-left text-sm font-medium text-zinc-600 dark:text-zinc-400">ดำเนินการ</th>
                 </tr>
             </thead>
             <tbody class="divide-y divide-zinc-200 dark:divide-zinc-700">
@@ -281,10 +282,20 @@ new class extends Component
                                 @endif
                             </div>
                         </td>
+                        <td class="block py-1 lg:table-cell lg:px-4 lg:py-3">
+                            @if (! $user->isAdmin() && $user->id !== auth()->id())
+                                <form method="POST" action="{{ route('admin.users.impersonate', $user) }}">
+                                    @csrf
+                                    <flux:button type="submit" size="xs" variant="ghost" icon="user-circle">
+                                        เข้าใช้งาน
+                                    </flux:button>
+                                </form>
+                            @endif
+                        </td>
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="4" class="px-4 py-8 text-center text-sm text-zinc-500">ไม่พบผู้ใช้</td>
+                        <td colspan="5" class="px-4 py-8 text-center text-sm text-zinc-500">ไม่พบผู้ใช้</td>
                     </tr>
                 @endforelse
             </tbody>

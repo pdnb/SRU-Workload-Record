@@ -17,8 +17,8 @@ class BackfillWorkloadStructuresMigrationTest extends TestCase
 {
     use DatabaseMigrations;
 
-    /** Migrations 000006 (backfill), 000007 (finalize) and 000008 (oracle columns). */
-    private const STEPS_AFTER_BACKFILL = 3;
+    /** Migrations 000006 (backfill), 000007 (finalize), 000008 (oracle columns) and impersonation_logs. */
+    private const STEPS_AFTER_BACKFILL = 4;
 
     private function rollbackToBeforeBackfill(): void
     {

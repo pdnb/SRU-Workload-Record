@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\EvidenceDownloadController;
 use App\Http\Controllers\EvidencePreviewController;
+use App\Http\Controllers\ImpersonationController;
 use App\Http\Controllers\PrintWorkRecordController;
 use App\Http\Controllers\PublicEvidenceDownloadController;
 use App\Http\Controllers\PublicEvidencePreviewController;
@@ -54,7 +55,13 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::livewire('periods', 'pages::admin.period-manager')->name('periods');
         Route::livewire('workloads', 'pages::admin.workload-manager')->name('workloads');
         Route::livewire('users', 'pages::admin.user-manager')->name('users');
+        Route::post('users/{user}/impersonate', [ImpersonationController::class, 'store'])
+            ->name('users.impersonate');
     });
 });
+
+// Outside role:* so an impersonated staff/hr session can still leave.
+Route::middleware('auth')->post('impersonate/leave', [ImpersonationController::class, 'destroy'])
+    ->name('impersonate.leave');
 
 require __DIR__.'/auth.php';

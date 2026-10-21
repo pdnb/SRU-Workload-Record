@@ -14,7 +14,9 @@
         .meta p { margin: 2px 0; }
         .badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 12px; background: #e5e5e5; }
         .entry { margin-bottom: 12px; padding: 10px; border: 1px solid #ddd; border-radius: 4px; page-break-inside: avoid; }
-        .entry-detail { white-space: pre-wrap; }
+        .entry-detail p { margin: 0 0 4px; }
+        .entry-detail ul, .entry-detail ol { margin: 4px 0; padding-left: 24px; }
+        .entry-detail a { color: #2563eb; }
         .entry-meta { font-size: 12px; color: #666; margin-top: 6px; }
         .summary { margin-top: 24px; padding: 12px; background: #f5f5f5; border-radius: 4px; }
         @media print {
@@ -60,7 +62,7 @@
                 @if ($entry->workload->score !== null)
                     <span class="badge" style="margin-left: 8px;">{{ number_format($entry->workload->score, 2) }} คะแนน</span>
                 @endif
-                <div class="entry-detail">{{ $entry->detail }}</div>
+                <div class="entry-detail">{!! \App\Support\RichText::render($entry->detail) !!}</div>
                 @if ($entry->result)
                     <div class="entry-meta"><strong>ผลลัพธ์:</strong> {{ $entry->result }}</div>
                 @endif

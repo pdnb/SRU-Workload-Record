@@ -250,7 +250,7 @@ new class extends Component
                                 wire:key="latest-entry-{{ $entry->id }}"
                                 class="rounded-lg border border-zinc-100 bg-zinc-50 px-3 py-3 text-sm dark:border-zinc-700 dark:bg-zinc-900"
                             >
-                                <span class="line-clamp-2 font-medium">{{ Str::limit($entry->detail, 200) }}</span>
+                                <span class="line-clamp-2 font-medium">{{ Str::limit(\App\Support\RichText::toPlainText($entry->detail), 200) }}</span>
                                 @if ($workload)
                                     <p class="mt-1 text-xs text-zinc-500">
                                         {{ $group?->name }}

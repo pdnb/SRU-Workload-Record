@@ -73,6 +73,31 @@ select:focus[data-flux-control] {
     @apply size-4;
 } */
 
+.rich-content p {
+    @apply my-1 first:mt-0 last:mb-0;
+}
+
+.rich-content ul {
+    @apply my-1 list-disc ps-6;
+}
+
+.rich-content ol {
+    @apply my-1 list-decimal ps-6;
+}
+
+.rich-content a {
+    @apply text-blue-600 underline dark:text-blue-400;
+}
+
+.rich-editor:focus-within {
+    @apply ring-2 ring-accent ring-offset-2 ring-offset-accent-foreground;
+}
+
+.rich-editor .tiptap p.is-editor-empty:first-child::before {
+    @apply pointer-events-none float-left h-0 text-zinc-400;
+    content: attr(data-placeholder);
+}
+
 [x-cloak] {
     display: none !important;
 }

@@ -146,7 +146,7 @@
                                 wire:click="openEntryModal({{ $workloadId }}, {{ $index }})"
                                 class="min-w-0 flex-1 cursor-pointer text-left hover:text-blue-600"
                             >
-                                <span class="line-clamp-2 font-medium">{{ Str::limit($entry['detail'], 200) }}</span>
+                                <span class="line-clamp-2 font-medium">{{ Str::limit(\App\Support\RichText::toPlainText($entry['detail']), 200) }}</span>
                                 @if (filled($entry['recorded_at'] ?? null) || filled($entry['result'] ?? null) || filled($entry['hours'] ?? null))
                                     <div class="mt-1 flex flex-wrap gap-1">
                                         @if (filled($entry['recorded_at'] ?? null))

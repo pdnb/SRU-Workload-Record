@@ -27,11 +27,10 @@
 <div class="space-y-4">
     <flux:field>
         <flux:label>รายละเอียดการดำเนินงาน <span class="text-red-500">*</span></flux:label>
-        <flux:textarea
-            wire:model="modalEntry.detail"
-            rows="6"
+        <x-rich-editor
+            model="modalEntry.detail"
+            :readonly="$readonly"
             placeholder="อธิบายรายละเอียดการดำเนินงานอย่างน้อย 10 ตัวอักษร"
-            :disabled="$readonly"
         />
         <flux:error name="modalEntry.detail" />
     </flux:field>

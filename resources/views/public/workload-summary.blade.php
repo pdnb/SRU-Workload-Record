@@ -63,7 +63,10 @@
             border-radius: 8px;
             background: #fafafa;
         }
-        .entry-detail { white-space: pre-wrap; margin-top: 8px; }
+        .entry-detail { margin-top: 8px; }
+        .entry-detail p { margin: 0 0 4px; }
+        .entry-detail ul, .entry-detail ol { margin: 4px 0; padding-left: 24px; }
+        .entry-detail a { color: #2563eb; }
         .entry-result { margin-top: 8px; font-size: 14px; color: #52525b; }
         .entry-meta { margin-top: 8px; font-size: 13px; color: #71717a; }
         .evidence-list { margin-top: 8px; padding-left: 0; list-style: none; }
@@ -130,7 +133,7 @@
 
             @forelse ($entries as $entry)
                 <div class="entry">
-                    <div class="entry-detail">{{ $entry->detail }}</div>
+                    <div class="entry-detail">{!! \App\Support\RichText::render($entry->detail) !!}</div>
                     @if ($entry->result)
                         <div class="entry-result"><strong>ผลลัพธ์:</strong> {{ $entry->result }}</div>
                     @endif

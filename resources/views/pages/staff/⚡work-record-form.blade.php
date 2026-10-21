@@ -13,6 +13,7 @@ use App\Models\WorkRecord;
 use App\Models\WorkloadGroup;
 use App\Models\WorkloadShare;
 use App\Models\WorkloadStructure;
+use App\Rules\RichTextMinLength;
 use App\Support\WorkloadStructureNumbering;
 use Flux\Flux;
 use Illuminate\Support\Facades\Auth;
@@ -1138,7 +1139,7 @@ new class extends Component
         }
 
         $rules = [
-            'modalEntry.detail' => ['required', 'string', 'min:10'],
+            'modalEntry.detail' => ['required', 'string', new RichTextMinLength(10)],
             'modalEntry.hours' => ['nullable', 'numeric', 'min:1', 'max:999'],
             'modalEntry.collaborator_ids' => ['nullable', 'array'],
             'modalEntry.collaborator_ids.*' => [

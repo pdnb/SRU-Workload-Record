@@ -1,10 +1,12 @@
 import Chart from 'chart.js/auto';
 import evidenceCapture from './evidence-capture';
+import richEditor from './rich-editor';
 
 window.Chart = Chart;
 
 document.addEventListener('alpine:init', () => {
     window.Alpine.data('evidenceCapture', evidenceCapture);
+    window.Alpine.data('richEditor', richEditor);
 });
 
 window.copyText = (text) => {
